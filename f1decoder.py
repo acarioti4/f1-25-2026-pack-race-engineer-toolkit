@@ -1,3 +1,5 @@
+import struct
+
 packet_names = {
       0: "Motion",
       1: "Session",
@@ -51,16 +53,29 @@ with open("f1_capture.bin", "rb") as capture:
                         packet_id = payload[6]
                         packet_name = packet_names.get(packet_id, "Unknown")
                         if packet_id == 6:
-                              if payload[5] != 1:
-                                    raise ValueError("Incorrect packet version.")
-                              player_index = payload[27]
-                              speed_offset = 29 + player_index * 59
-                              if len(payload) < speed_offset + 2:
-                                    raise ValueError("Telemetry packet is missing the player's speed.")
-                              speed = int.from_bytes(
-                                    payload[speed_offset:speed_offset + 2], "little"
-                              )
-                              print(f"Speed: {speed} km/h")
+                            if payload[5] != 1:
+                                raise ValueError("Incorrect packet version.")
+
+                            player_index = payload[27]
+                            speed_offset = 29 + player_index * 59
+                            if len(payload) < speed_offset + 2:
+                                raise ValueError("Telemetry packet is missing the player's speed.")
+                            speed = int.from_bytes(
+                                payload[speed_offset:speed_offset + 2], "little"
+                            )
+                            gear_offset = speed_offset + 15
+                            if len(payload) < gear_offset + 1:
+                                raise ValueError("Telemetry packet is missing player's gear.")
+                            gear = int.from_bytes(payload[gear_offset:gear_offset + 1], "little", signed=True)
+
+                            throttle_offset = speed_offset + 2
+                            throttle = struct.unpack_from("<f", payload, throttle_offset)
+
+                            print(
+                                f"Speed: {speed} km/h | "
+                                f"Gear: {gear} | "
+                                f"Throttle %: {throttle} | "
+                            )
 
                         record_counter += 1
                         print(f"Timestamp: {timestamp}")

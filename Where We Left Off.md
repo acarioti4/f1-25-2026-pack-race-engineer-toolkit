@@ -21,21 +21,23 @@ In `f1decoder.py`, we have worked through:
 - For Car Telemetry packets (ID `6`), checking packet version `1`.
 - Reading the player's car index from header byte `27`.
 - Locating and decoding the player's speed in km/h, with a length check first.
+- Locating and decoding the player's signed gear value, including reverse (`-1`).
+- Starting throttle decoding with `struct.unpack_from` at the documented offset. This is still in progress: `unpack_from` returns a tuple, and the current print label says percent even though the protocol value is in the 0-to-1 range.
 
 ## Next coding step
 
-Decode the player's gear from the same Car Telemetry car record.
+Finish the throttle display before adding another field.
 
-- `speed_offset` is the start of the player's 59-byte telemetry record.
-- Gear is 15 bytes into that record, so its byte offset is `speed_offset + 15`.
-- Gear is a signed 8-bit value. Use `int.from_bytes` with `signed=True` so reverse can be `-1`.
-- Print the decoded gear beside the speed.
+- `throttle_offset` is `speed_offset + 2`; throttle is a 4-byte little-endian float.
+- `struct.unpack_from("<f", payload, throttle_offset)` returns a one-item tuple. Store the float inside it to print a scalar.
+- Either label the 0-to-1 value as `Throttle` or multiply it by 100 before labeling it `Throttle %`.
+- The existing gear length check reaches beyond the throttle bytes, so it also ensures those bytes are present.
 
-After you make the change, ask me to check it. We can then decode throttle, brake, and RPM, and make the decoder easier to read before connecting it to a live dashboard.
+After that, review the output, then continue with brake and RPM. Keep using the supplied packet specification to verify each field's offset and representation.
 
 ## Remaining roadmap
 
-1. Decode a few useful car values and handle packet versions and short payloads carefully.
+1. Complete throttle, then decode brake and RPM and handle packet versions and short payloads carefully.
 2. Refactor packet parsing into small functions and keep it separate from UDP receiving.
 3. Choose a Python desktop UI framework and display live values with connection/freshness status.
 4. Run the receiver and dashboard together, then add more telemetry views.
