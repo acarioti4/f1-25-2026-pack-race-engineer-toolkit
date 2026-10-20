@@ -24,23 +24,23 @@ with open("f1_capture.bin", "rb") as capture:
     record_counter = 0
     while True:
         timestamp_bytes = capture.read(8)
-        
+
         if timestamp_bytes == b"":
                 break # End of file.
         elif len(timestamp_bytes) < 8:
                 raise ValueError("Truncated timestamp.")
         else:
             timestamp = int.from_bytes(timestamp_bytes, "little")
-        
+
             length_bytes = capture.read(4)
-        
+
             if len(length_bytes) < 4:
                 raise ValueError("Truncated packet length!")
             else:
                 length = int.from_bytes(length_bytes, "little")
-        
+
                 payload = capture.read(length)
-        
+
                 if len(payload) != length:
                         raise ValueError("Truncated packet payload!")
                 else:
@@ -59,22 +59,41 @@ with open("f1_capture.bin", "rb") as capture:
                             player_index = payload[27]
                             speed_offset = 29 + player_index * 59
                             if len(payload) < speed_offset + 2:
-                                raise ValueError("Telemetry packet is missing the player's speed.")
-                            speed = int.from_bytes(
-                                payload[speed_offset:speed_offset + 2], "little"
-                            )
+                                raise ValueError("Telemetry packet is missing the player's speed data.")
+                            speed = int.from_bytes(payload[speed_offset:speed_offset + 2], "little")
+
                             gear_offset = speed_offset + 15
                             if len(payload) < gear_offset + 1:
-                                raise ValueError("Telemetry packet is missing player's gear.")
+                                raise ValueError("Telemetry packet is missing player's gear data.")
                             gear = int.from_bytes(payload[gear_offset:gear_offset + 1], "little", signed=True)
 
                             throttle_offset = speed_offset + 2
-                            throttle = struct.unpack_from("<f", payload, throttle_offset)
+                            throttle = struct.unpack_from("<f", payload, throttle_offset)[0]
+                            throttle = throttle * 100
+
+                            brake_offset = speed_offset + 10
+                            if len(payload) < brake_offset + 4:
+                                raise ValueError("Telemetry packet is missing player's brake data.")
+                            brake = struct.unpack_from("<f", payload, brake_offset)[0]
+                            brake = brake * 100
+
+                            rpm_offset = speed_offset + 16
+                            if len(payload) < rpm_offset + 2:
+                                raise ValueError("Telemetry packet is missing player's RPM data.")
+                            rpm = int.from_bytes(payload[rpm_offset:rpm_offset + 2], "little")
+
+                            steering_offset = speed_offset + 6
+                            if len(payload) < steering_offset + 4:
+                                raise ValueError("Telemetry packet is missing player's steering data.")
+                            steering = struct.unpack_from("<f", payload, steering_offset)[0]
 
                             print(
                                 f"Speed: {speed} km/h | "
                                 f"Gear: {gear} | "
                                 f"Throttle %: {throttle} | "
+                                f"Brake %: {brake} | "
+                                f"RPM: {rpm} | "
+                                f"Steering: {steering} | "
                             )
 
                         record_counter += 1
