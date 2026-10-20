@@ -4,7 +4,7 @@
 
 F1 25 (2026 Pack) Race Engineer Toolkit is a prototype for receiving live data from **F1 25 using the 2026 Season Pack UDP format** and displaying it in a desktop dashboard that updates as telemetry packets arrive while the game is running.
 
-The current prototype captures UDP packets and decodes basic packet information from saved captures. The next goal is to decode a small, useful set of car values and then connect them to a live desktop display. The emphasis is on understanding the data and building a dependable foundation before expanding the dashboard.
+The current prototype captures UDP packets and decodes basic packet information from saved captures. It decodes player speed and gear from Car Telemetry packets; throttle decoding has been started and is the current learning step. The next goal is to finish a small, useful set of car values and then connect them to a live desktop display. The emphasis is on understanding the data and building a dependable foundation before expanding the dashboard.
 
 ## How the project fits together
 
@@ -20,10 +20,10 @@ The supplied specification states that packet values use **little-endian encodin
 
 ## Current state
 
-The Python files form an early proof of concept for receiving, recording, and decoding captured telemetry. There is not yet a desktop application, and only player speed is decoded from the telemetry body so far.
+The Python files form an early proof of concept for receiving, recording, and decoding captured telemetry. There is not yet a desktop application; player speed and gear are decoded from the telemetry body, and throttle display is in progress.
 
 - **`udpreceiver.py`** binds a UDP socket to `127.0.0.1:20888`, prints the packet length, packet format and packet ID, prints each packet as hexadecimal bytes, and appends the packet to `f1_capture.bin` with a timestamp and payload length. It already imports `time` for timestamps.
-- **`f1decoder.py`** reads all records from `f1_capture.bin` and reports truncated timestamps, lengths, or payloads. It checks for the 2026 packet format, identifies packet types by ID, and decodes player speed from Car Telemetry packets (ID 6, packet version 1). Other telemetry values are not decoded yet.
+- **`f1decoder.py`** reads all records from `f1_capture.bin` and reports truncated timestamps, lengths, or payloads. It checks for the 2026 packet format, identifies packet types by ID, and decodes player speed and signed gear from Car Telemetry packets (ID 6, packet version 1). Throttle unpacking has been added but still needs to extract the float from the returned tuple and use a label that matches the 0-to-1 value (or convert it to percent). Brake and RPM are not decoded yet.
 - **The desktop UI is not implemented yet.** No desktop framework has been selected.
 
 ## Getting started
@@ -64,7 +64,7 @@ Run:
 python f1decoder.py
 ```
 
-The decoder processes each complete record in `f1_capture.bin`, prints packet metadata and a readable packet type, and prints player speed for Car Telemetry packets. It stops with a clear error if it encounters a truncated record or an unsupported UDP format.
+The decoder processes each complete record in `f1_capture.bin`, prints packet metadata and a readable packet type, and prints player speed and gear for Car Telemetry packets. Throttle is currently being wired into the output; finish converting the one-item tuple returned by `struct.unpack_from` into a scalar before relying on that display. The decoder stops with a clear error if it encounters a truncated record or an unsupported UDP format.
 
 ## Capture file format
 
@@ -83,7 +83,7 @@ The decoder uses the length field to determine how many bytes belong to each pac
 Build the project in small steps, making sure each layer works before adding more complexity.
 
 1. **Decode a few more useful values**
-   - Add player gear, then throttle, brake, and RPM from Car Telemetry packets.
+   - Finish throttle output, then add brake and RPM from Car Telemetry packets. Player gear is already decoded.
    - Use the specification's field types, units, packed layouts, and vehicle indices rather than guessing from raw bytes.
    - Add lap time and position using the appropriate packet types.
 
@@ -115,6 +115,6 @@ The project includes **`Data Output from F1 25 2026 Season Pack.pdf`**, version 
 
 ## Milestones
 
-- **Current:** receive and record raw UDP telemetry packets; decode packet IDs and player speed from saved captures.
-- **Next:** decode more useful fields and return structured telemetry data.
+- **Current:** receive and record raw UDP telemetry packets; decode packet IDs, player speed, and gear from saved captures; finish the in-progress throttle display.
+- **Next:** add brake and RPM, then return useful fields as structured telemetry data.
 - **After that:** display live values in a desktop app with connection and freshness status.
