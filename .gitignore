@@ -1,0 +1,13 @@
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Captured live telemetry is local data, not source
+f1_capture.bin
+
+# Local Python environments and secrets
+.venv/
+venv/
+.env
+.env.*
+!.env.example
