@@ -88,7 +88,7 @@ Validation should grow alongside each milestone; this final milestone completes 
 
 ## Scope
 
-Windows and the 2026 packet format are the initial targets. Raw captures stay excluded from Git. Cloud services, other protocol years, and derived race-strategy predictions are outside the current roadmap.
+Windows and the 2026 packet format are the initial targets. The roadmap can grow as the project develops; cloud services, support for other protocol years, and race-strategy predictions are possible future directions. Raw captures stay excluded from Git.
 
 ## Next milestone task
 
