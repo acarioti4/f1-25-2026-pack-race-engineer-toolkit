@@ -95,6 +95,29 @@ with open("f1_capture.bin", "rb") as capture:
                                 f"RPM: {rpm} | "
                                 f"Steering: {steering} | "
                             )
+                        elif packet_id == 2:
+                             if payload[5] != 1:
+                                  raise ValueError("Incorrect Lap Data packet version.")
+                             player_index = payload[27]
+                             lap_offset = 29 + player_index * 57
+                             current_lap_time_offset = lap_offset + 4
+                             if len(payload) < current_lap_time_offset + 4:
+                                  raise ValueError("Telemetry packet is missing Current Lap Time data.")
+                             current_lap_time = int.from_bytes(payload[current_lap_time_offset:current_lap_time_offset + 4], "little") / 1000
+                             print(f"Current Lap Time: {current_lap_time}")
+
+                             race_position_offset = lap_offset + 32
+                             if len(payload) < race_position_offset + 1:
+                                  raise ValueError("Telemetry packet is missing Position data.")
+                             race_position = payload[race_position_offset]
+                             print(f"Current Position: P{race_position}")
+
+                             lap_number_offset = lap_offset + 33
+                             if len(payload) < lap_number_offset + 1:
+                                  raise ValueError("Telemetry packet is missing Lap data.")
+                             lap_number = payload[lap_number_offset]
+                             print(f"Lap: {lap_number}")
+
 
                         record_counter += 1
                         print(f"Timestamp: {timestamp}")
