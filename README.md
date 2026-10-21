@@ -1,120 +1,76 @@
 # F1 25 (2026 Pack) Race Engineer Toolkit
 
-## Overview
+A learning project for a Windows telemetry desktop app using Python and PySide6. The current prototype captures UDP packets and reads saved captures; no desktop interface or automated test suite exists yet. The supplied **F1 25: 2026 Season Pack UDP specification v1.2** is the source of truth. The user writes implementation and test code; the assistant explains, investigates, and reviews. See AGENTS.md for the full roadmap.
 
-F1 25 (2026 Pack) Race Engineer Toolkit is a prototype for receiving live data from **F1 25 using the 2026 Season Pack UDP format** and displaying it in a desktop dashboard that updates as telemetry packets arrive while the game is running.
+## Current behavior
 
-The current prototype captures UDP packets and decodes basic packet information from saved captures. The next goal is to decode a small, useful set of car values and then connect them to a live desktop display. The emphasis is on understanding the data and building a dependable foundation before expanding the dashboard.
+- `udpreceiver.py` listens on `127.0.0.1:20888`, prints its address and capture path at startup, and appends packets to `f1_capture.bin` beside the script. It flushes each record and stops with Ctrl+C. It does not print individual packets. Restarting appends to the same file.
+- `f1decoder.py` reads every capture record, checks capture boundaries, the 29-byte header, and the 2026 format, and labels packet IDs. For IDs 6 and 2 it checks version 1 and player indices 0-23 before decoding the implemented fields. It prints decoded values, packet metadata, and a final record count. Malformed input or unsupported formats/implemented packet versions terminate the offline reader with an error.
+- Car Telemetry fields: player speed (km/h), signed gear, throttle (%), brake (%), RPM, and steering (-1 left to +1 right).
+- Lap Data fields: player current lap time (milliseconds converted to seconds), race position, and lap number.
+- Both Python files include explanatory comments. Other packet types are named but their payload fields are not yet decoded.
 
-## How the project fits together
+## Run the prototype
 
-The intended data flow is:
+Use Python 3; the scripts require only the standard library. In the game enable UDP output, select the 2026 format, and set destination `127.0.0.1:20888` when running on the same PC. The destination must match the receiver settings. The specification's example port 20777 differs from this project's default 20888.
 
-1. **The game sends telemetry.** F1 broadcasts data over UDP when telemetry output is enabled and configured.
-2. **A receiver listens for packets.** The Python receiver waits on a local IP address and port.
-3. **Packets are captured for inspection.** Raw packets can be saved so the incoming data can be checked and used during development.
-4. **A decoder interprets packet contents.** The game sends different packet types for different kinds of information. The packet header identifies the format and packet type; the decoder must use the matching structure from the specification.
-5. **The desktop app displays decoded values.** Once the data is structured, the interface can refresh as each new packet arrives and indicate when data is unavailable or has gone stale.
-
-The supplied specification states that packet values use **little-endian encoding** and packed structures. It also documents multiple packet types rather than one packet containing all telemetry. The decoder therefore needs to identify packet types and parse each supported layout correctly.
-
-## Current state
-
-The Python files form an early proof of concept for receiving, recording, and decoding captured telemetry. There is not yet a desktop application, and only player speed is decoded from the telemetry body so far.
-
-- **`udpreceiver.py`** binds a UDP socket to `127.0.0.1:20888`, prints the packet length, packet format and packet ID, prints each packet as hexadecimal bytes, and appends the packet to `f1_capture.bin` with a timestamp and payload length. It already imports `time` for timestamps.
-- **`f1decoder.py`** reads all records from `f1_capture.bin` and reports truncated timestamps, lengths, or payloads. It checks for the 2026 packet format, identifies packet types by ID, and decodes player speed from Car Telemetry packets (ID 6, packet version 1). Other telemetry values are not decoded yet.
-- **The desktop UI is not implemented yet.** No desktop framework has been selected.
-
-## Getting started
-
-### 1. Enable UDP telemetry in the game
-
-In the game's UDP telemetry settings:
-
-- Enable UDP telemetry output.
-- Set the target IP to `127.0.0.1` when the receiver runs on the same computer.
-- Set the target port to **`20888`** to match the current receiver, or change the receiver to match the port configured in the game.
-- Select the **`2026`** UDP format to match the supplied *F1 25: 2026 Season Pack* specification.
-- Choose a send rate supported by the game settings.
-
-The specification's example configuration shows port `20777`, while this project's receiver currently listens on `20888`. These values must match; the README uses `20888` because that is what the current Python code configures. If the game and receiver are on different computers, the receiver address and network configuration will also need to be adjusted.
-
-### 2. Prepare Python
-
-Use a Python installation and environment for the project. The current receiver and decoder use only Python's built-in modules. No third-party packages are required for the current scripts.
-
-### 3. Run the receiver
-
-Run:
+Start recording:
 
 ```bash
 python udpreceiver.py
 ```
 
-When the game is configured to send packets, the terminal should print basic information about each incoming datagram. Raw packets are appended to `f1_capture.bin` in the current working directory. Stop capture with `Ctrl+C`.
-
-The receiver currently prints every packet in hexadecimal, which is useful for initial debugging but can produce a large amount of terminal output during a session.
-
-### 4. Inspect a capture
-
-Run:
+Stop with Ctrl+C, then inspect the saved capture:
 
 ```bash
 python f1decoder.py
 ```
 
-The decoder processes each complete record in `f1_capture.bin`, prints packet metadata and a readable packet type, and prints player speed for Car Telemetry packets. It stops with a clear error if it encounters a truncated record or an unsupported UDP format.
+The capture path is relative to the scripts, regardless of the terminal's working directory. Captures may contain multiple recording periods because the receiver appends. Raw captures are local data excluded from Git.
 
-## Capture file format
+## Capture format
 
-The receiver writes each record to `f1_capture.bin` in this order:
+| Field | Size | Encoding |
+| --- | --- | --- |
+| Receive timestamp | 8 bytes | Unix nanoseconds from time.time_ns(), little-endian |
+| Payload length | 4 bytes | Unsigned little-endian byte count |
+| Payload | Variable | Original game UDP bytes |
 
-| Field | Size | Meaning |
-| --- | ---: | --- |
-| Timestamp | 8 bytes | `time.time_ns()` value stored as a little-endian integer |
-| Payload length | 4 bytes | Number of bytes in the UDP datagram, stored as a little-endian integer |
-| Payload | Variable | Raw UDP datagram received from the game |
+The reader distinguishes normal EOF from truncated timestamps, lengths, and payloads. Game structures are packed and use little-endian values. Player records begin after the 29-byte header: Car Telemetry uses 59-byte records; Lap Data uses 57-byte records.
 
-The decoder uses the length field to determine how many bytes belong to each packet. It loops until end-of-file and checks for incomplete timestamps, lengths, and payloads.
+## Capture validation: October 20, 2026
 
-## What’s next
+The existing decoder processed **71,243 complete records**, including **9,695 Car Telemetry** and **9,695 Lap Data** packets, with exit code 0. This was a game-capture playback check, not an automated fixture suite or a simultaneous comparison with the game's display.
 
-Build the project in small steps, making sure each layer works before adding more complexity.
+| Field or action | Observed result |
+| --- | --- |
+| Speed | 0-318 km/h |
+| Gear | Neutral (0) and forward gears 1-8 |
+| Throttle and brake | Each ranged from 0-100% |
+| RPM | 3,920-13,204 |
+| Steering | Approximately -1.00 to +0.73 |
+| Complete stop in neutral | 5,796 telemetry samples at 0 km/h and gear 0 |
+| Simultaneous throttle and brake | 617 samples with both positive |
+| Example overlap | 0 km/h, neutral, 30.25% throttle, 98.46% brake, 10,584 RPM |
+| Current lap time | 0-32.35 seconds |
+| Position | P10, P11, P12, P15, P16, P17 |
+| Lap number | 1 throughout |
 
-1. **Decode a few more useful values**
-   - Add player gear, then throttle, brake, and RPM from Car Telemetry packets.
-   - Use the specification's field types, units, packed layouts, and vehicle indices rather than guessing from raw bytes.
-   - Add lap time and position using the appropriate packet types.
+The six telemetry fields produced plausible game-capture values, including the reported stop and pedal overlap. Reverse is **assumed working at the user's request**, based on the signed gear decoding; no reverse sample occurred in this capture. The burnout remains unconfirmed from these six fields alone; wheel-speed or slip data would provide stronger evidence. Lap Data offsets, types, and units were reviewed against the supplied specification, but the decoded lap values still need comparison with the game. Lap progression and full steering travel were not covered.
 
-2. **Create a clean boundary between the receiver and decoder**
-   - Keep UDP receiving separate from packet parsing.
-   - Convert supported packets into a consistent, structured representation for the UI.
-   - Make sure slow parsing or display work does not block packet reception.
+No synthetic fixtures or malformed-input tests were run. Capture success does not establish every validation branch, other car indices, restricted-data handling, or all documented data coverage. Comment additions were checked to preserve both scripts' Python syntax trees.
 
-3. **Choose and build the desktop app**
-   - Select a desktop UI framework that fits the project and can work with the Python telemetry layer.
-   - Display a small set of values and refresh as new telemetry arrives.
-   - Show whether data is connected, stale, or unavailable.
-   - Keep receiving packets responsive while the UI updates.
-   - Add more information only after the first values update consistently.
+## One next learning task
 
-4. **Harden and document the prototype**
-   - Handle unsupported packet versions and malformed packets clearly.
-   - Keep generated capture files out of version control; `.gitignore` already excludes `f1_capture.bin`.
+Begin the coverage inventory with a Car Telemetry table: list every documented record field and packet trailing field, type, offset, unit, and availability rule. Track implementation, specification review, fixture testing, and game verification separately. Completion means the whole packet is accounted for against the supplied PDF and the six implemented fields are accurately marked. No new decoder code is needed for this task.
 
-## Longer-term direction
+## Roadmap
 
-The end goal is a desktop telemetry dashboard that makes the game's UDP data easy to read while driving or reviewing a session. It should update when new packets arrive and make the current connection and data freshness clear. Once the basic receiver, decoder, and UI are dependable, the project could grow to include more race and car information, tyre and damage data, event notifications, timing views, and richer visualizations.
+1. Inventory packet types 0-16, header fields, event variants, and lookup tables; extend decoding one field at a time.
+2. Separate receiving, capture reading, decoding, and presentation. Return structured results and preserve the capture format.
+3. Decode all documented fields and car slots, respecting active counts, availability, mode differences, and multiplayer restrictions. Withheld data must not appear as genuine zero measurements.
+4. Maintain shared session/car state, freshness, events, and historical data independently of widgets.
+5. Build the PySide6 Windows interface with reception outside the UI thread, capture/playback, searchable field access, and selectable dashboards.
+6. Add user-written fixture and state checks, document game-verification gaps, and package with PyInstaller. Verify on Windows without a development Python installation.
 
-These are possible future additions, not features implemented by the current scripts.
-
-## Reference
-
-The project includes **`Data Output from F1 25 2026 Season Pack.pdf`**, version 1.2. Use it when implementing the decoder. It describes the packet header, packet IDs, data structures, data types, and encoding conventions for the 2026 Season Pack. Packet layouts should be checked against the chosen in-game UDP format and the version of the specification being used.
-
-## Milestones
-
-- **Current:** receive and record raw UDP telemetry packets; decode packet IDs and player speed from saved captures.
-- **Next:** decode more useful fields and return structured telemetry data.
-- **After that:** display live values in a desktop app with connection and freshness status.
+See Where We Left Off.md for the session handoff and AGENTS.md for detailed acceptance checks. Cloud services, other protocol years, and derived race-strategy predictions are outside the current roadmap.

@@ -1,45 +1,40 @@
 # Where We Left Off: F1 25 (2026 Pack) Race Engineer Toolkit
 
-**Date:** October 19, 2026
+**Date:** October 20, 2026
 
-## Project goal
+## Collaboration rules
 
-Build the F1 25 (2026 Pack) Race Engineer Toolkit together, with you writing the code and me explaining concepts, reviewing each change, and helping with the next step.
+The user writes implementation and test code. The assistant teaches, investigates, and reviews one manageable task at a time. Follow AGENTS.md and the supplied specification. In this session the user explicitly authorized explanatory comments in both Python files, documentation updates, and committing/pushing all project changes. Only comments were added to Python during this documentation work; behavior was preserved.
 
-## Current progress
+## Completed work
 
-The project currently has a UDP packet receiver in `udpreceiver.py` and a capture reader/early decoder in `f1decoder.py`. There is not yet a desktop UI.
+- The receiver records on 127.0.0.1:20888 using the existing timestamp-length-payload format, appending to f1_capture.bin beside the script. It prints startup details, not individual packets.
+- The decoder checks capture framing and the 2026 format, labels packet IDs, and prints metadata. Packet IDs 6 and 2 require version 1 and a player index from 0 to 23.
+- Car Telemetry decoding covers player speed, signed gear, throttle percentage, brake percentage, RPM, and steering. Player record start: 29 + index * 59.
+- Lap Data decoding covers current lap time (unsigned 32-bit milliseconds at record +4, displayed as seconds), position (byte +32), and lap number (byte +33). Player record start: 29 + index * 57.
+- Added comments explaining capture framing, offsets, types, conversions, bounds checks, output, and socket/file lifecycle. Syntax-tree comparison confirms these comments preserve executable behavior.
 
-In `f1decoder.py`, we have worked through:
+## Game-capture check
 
-- Reading every capture record until end of file.
-- Detecting incomplete timestamps, packet lengths, and payloads.
-- Counting complete records.
-- Checking that the payload contains the 29-byte packet header.
-- Reading the packet format and confirming it is `2026`.
-- Reading the packet ID and mapping IDs to readable names.
-- For Car Telemetry packets (ID `6`), checking packet version `1`.
-- Reading the player's car index from header byte `27`.
-- Locating and decoding the player's speed in km/h, with a length check first.
+The existing decoder processed **71,243 complete records** without error, including **9,695 Car Telemetry** and **9,695 Lap Data** packets. No fixture suite was written or run.
 
-## Next coding step
+- Speed: 0-318 km/h; neutral and forward gears 1-8 observed.
+- Throttle/brake: each 0-100%; 617 samples had both positive.
+- One overlap sample: 0 km/h, neutral, 30.25% throttle, 98.46% brake, 10,584 RPM.
+- 5,796 samples showed a complete stop in neutral.
+- RPM: 3,920-13,204; steering: approximately -1.00 to +0.73.
+- Lap time: 0-32.35 seconds; positions P10/P11/P12/P15/P16/P17; lap 1 throughout.
 
-Decode the player's gear from the same Car Telemetry car record.
+These are plausible observations from a game capture, not exact comparisons with on-screen instruments. Reverse is assumed working at the user's request; signed decoding supports -1, but the capture contains no reverse samples. Do not make another reverse capture the next task. A burnout cannot be confirmed from the six decoded fields alone. Lap offsets match the specification, but lap values, progression, and full steering travel still have game-verification gaps.
 
-- `speed_offset` is the start of the player's 59-byte telemetry record.
-- Gear is 15 bytes into that record, so its byte offset is `speed_offset + 15`.
-- Gear is a signed 8-bit value. Use `int.from_bytes` with `signed=True` so reverse can be `-1`.
-- Print the decoded gear beside the speed.
+## Unresolved work
 
-After you make the change, ask me to check it. We can then decode throttle, brake, and RPM, and make the decoder easier to read before connecting it to a live dashboard.
+There is no automated test suite, desktop UI, complete coverage catalog, or structured decoder interface. Capture success does not verify malformed input, unsupported versions, other car indices, restricted data, or every field. The offline decoder stops on errors; future live decoding must report diagnostics without stopping reception. Raw captures remain ignored by Git.
 
-## Remaining roadmap
+## One next task: Car Telemetry coverage inventory
 
-1. Decode a few useful car values and handle packet versions and short payloads carefully.
-2. Refactor packet parsing into small functions and keep it separate from UDP receiving.
-3. Choose a Python desktop UI framework and display live values with connection/freshness status.
-4. Run the receiver and dashboard together, then add more telemetry views.
+Create a documentation table for every field in the Car Telemetry record and its packet trailing fields. Record the specification name, type, record/packet offset, unit, availability, and separate statuses for implementation, specification review, fixture testing, and game verification. Mark the six implemented fields and preserve the verification gaps above. Completion means every field in this packet is accounted for against the supplied PDF. No new decoder code is needed for this task.
 
-## Reference
+## Roadmap and reference
 
-Use `Data Output from F1 25 2026 Season Pack.pdf` as the source of truth for packet IDs, field types, byte order, sizes, and offsets. The Car Telemetry packet is described in the specification's Car Telemetry section.
+Continue the inventory across packet types 0-16, then separate capture reading, decoding, and presentation; expand all documented data; build shared session/car state; add the PySide6 Windows UI; package with PyInstaller. Preserve the capture format and default address. Use Data Output from F1 25 2026 Season Pack.pdf, version 1.2, as the source of truth. README contains current usage and validation details.
