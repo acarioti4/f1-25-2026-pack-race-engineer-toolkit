@@ -1,6 +1,6 @@
 # F1 25 (2026 Pack) Race Engineer Toolkit
 
-A hobby learning project exploring F1 telemetry with Python. The goal is a Windows desktop app built with PySide6 for viewing the data exposed by **F1 25: 2026 Season Pack UDP specification v1.2**.
+A learning project exploring F1 telemetry with Python. The goal is a Windows desktop app built with PySide6 for viewing the data exposed by **F1 25: 2026 Season Pack UDP specification v1.2**.
 
 The current prototype records UDP packets and decodes selected player telemetry and lap data from saved captures. A desktop interface is planned but is not implemented yet.
 
