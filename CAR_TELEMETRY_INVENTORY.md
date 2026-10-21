@@ -1,6 +1,6 @@
 # Car Telemetry inventory
 
-Reference map prepared on October 20, 2026. Source: [supplied UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf), pages 2-3 (header and IDs), 11 (telemetry), 19-20 (restrictions), 21 (wheel order), and 30 (surface types). Implementation checked against `f1decoder.py`; capture evidence comes from `Where We Left Off.md`. No decoder or test code was changed or run for this inventory.
+Reference map prepared on October 20, 2026; implementation coverage updated October 21, 2026. Source: [supplied UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf), pages 2-3 (header and IDs), 11 (telemetry), 19-20 (restrictions), 21 (wheel order), and 30 (surface types). Implementation checked against `f1decoder.py`; capture evidence comes from `Where We Left Off.md`. The updated decoder passed Python syntax checking; no fixture or capture playback tests were run for this update.
 
 ## Packet overview
 
@@ -41,6 +41,10 @@ The final field occupies offsets 55-58, so the next record begins 59 bytes after
 
 All wheel arrays use: **0 rear left, 1 rear right, 2 front left, 3 front right**. Each element starts at the array's offset plus its index multiplied by the size of one element.
 
+Application terminology: **tyre core temperature** maps to the specification's `m_tyresInnerTemperature`. Core and surface are the user's chosen racing terms for display and teaching. The protocol field name remains unchanged in this inventory.
+
+The player decoder reads brake temperatures with `struct.unpack_from("<4H", ...)` and tyre surface/core temperatures with `struct.unpack_from("<4B", ...)`. It checks the field offset plus eight or four bytes respectively, retains each four-value tuple, and indexes it directly in the labelled Celsius output.
+
 ## Whole-packet layout and trailing fields
 
 These offsets count from the start of the UDP packet, excluding the capture file's timestamp and length prefix.
@@ -73,9 +77,9 @@ Reviewed means the layout and meaning were checked against the supplied PDF. It 
 | m_drs | No | Yes | No | Not checked |
 | m_revLightsPercent | No | Yes | No | Not checked |
 | m_revLightsBitValue | No | Yes | No | Not checked |
-| m_brakesTemperature | No | Yes | No | Not checked |
-| m_tyresSurfaceTemperature | No | Yes | No | Not checked |
-| m_tyresInnerTemperature | No | Yes | No | Not checked |
+| m_brakesTemperature | Player only, all four wheels; syntax check passed | Yes | No | Playback and game comparison pending |
+| m_tyresSurfaceTemperature | Player only, all four wheels; syntax check passed | Yes | No | Playback and game comparison pending |
+| m_tyresInnerTemperature | Player only, all four wheels, displayed as core temperature; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_engineTemperature | Player only; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_tyresPressure | No | Yes | No | Not checked |
 | m_surfaceType | No | Yes | No | Not checked |
@@ -83,7 +87,7 @@ Reviewed means the layout and meaning were checked against the supplied PDF. It 
 | m_mfdPanelIndexSecondaryPlayer | No | Yes | No | Not checked |
 | m_suggestedGear | No | Yes | No | Not checked |
 
-Before engine temperature was added, recorded playback processed 71,243 records, including 9,695 Car Telemetry packets. This is evidence of successful playback with plausible values, not complete decoder verification. Other car slots, split-screen behavior, multiplayer availability, malformed inputs, and exact in-game comparisons remain untested or incomplete. The decoder currently checks enough bytes for selected fields, not the complete 1448-byte layout.
+Before engine temperature was added, recorded playback processed 71,243 records, including 9,695 Car Telemetry packets. This is evidence of successful playback with plausible values, not complete decoder verification; it does not cover engine temperature or the subsequent brake, tyre surface, and tyre core additions. Other car slots, split-screen behavior, multiplayer availability, malformed inputs, and exact in-game comparisons remain untested or incomplete. The decoder currently checks enough bytes for selected fields, not the complete 1448-byte layout.
 
 ## Surface lookup
 

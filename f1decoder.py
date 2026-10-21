@@ -114,8 +114,23 @@ with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
 
                             engine_temp_offset = speed_offset + 38
                             if len(payload) < engine_temp_offset + 1:
-                                 raise ValueError("Telemetry packet is missing player's engine.temp data.")
+                                 raise ValueError("Telemetry packet is missing player's engine temp data.")
                             engine_temp = payload[engine_temp_offset]
+                            
+                            brake_temp_offset = speed_offset + 22
+                            if len(payload) < brake_temp_offset + 8:
+                                  raise ValueError("Telemetry packet is missing player's brake temp data.")
+                            brake_temps = struct.unpack_from("<4H", payload, brake_temp_offset) # Order is LR, RR, LF, RF.
+                            
+                            surface_temp_offset = speed_offset + 30
+                            if len(payload) < surface_temp_offset + 4:
+                                  raise ValueError ("Telemetry packet is missing player's tyre surface temp data.")
+                            t_surface_temps = struct.unpack_from("<4B", payload, surface_temp_offset) # Order is LR, RR, LF, RF.
+                            
+                            core_temp_offset = speed_offset + 34
+                            if len(payload) < core_temp_offset + 4:
+                                  raise ValueError("Telemetry packet is missing player's core tyre temp data.")
+                            t_core_temps = struct.unpack_from("<4B", payload, core_temp_offset) # Order is LR, RR, LF, RF.
 
                             # Present the player values together for capture inspection.
                             print(
@@ -126,7 +141,11 @@ with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
                                 f"RPM: {rpm} | "
                                 f"Steering: {steering} | "
                                 f"Engine Temp: {engine_temp}°C | "
+                                f"Brake Temps: LR - {brake_temps[0]}°C | RR - {brake_temps[1]}°C | LF - {brake_temps[2]}°C | RF - {brake_temps[3]}°C | "
+                                f"Tyre Surface Temp: LR - {t_surface_temps[0]}°C | RR - {t_surface_temps[1]}°C | LF - {t_surface_temps[2]}°C | RF - {t_surface_temps[3]}°C | "
+                                f"Tyre Core Temp: LR - {t_core_temps[0]}°C | RR - {t_core_temps[1]}°C | LF - {t_core_temps[2]}°C | RF - {t_core_temps[3]}°C | "
                             )
+                            
                         elif packet_id == 2:
                              # Lap Data has its own version and 57-byte per-car layout.
                              if payload[5] != 1:

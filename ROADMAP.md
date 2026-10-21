@@ -12,12 +12,15 @@ This is a hobby learning project. Milestones describe the intended development o
 - [x] Decode player current lap time, race position, and lap number.
 - [x] Exercise the original six telemetry fields and three lap fields through saved game-capture playback.
 - [x] Add player engine temperature; specification review and syntax check passed.
-- [ ] Exercise engine temperature through saved-capture playback.
+- [x] Add brake, tyre surface, and tyre core temperatures for all four player wheels; layout review and syntax check passed.
+- [ ] Exercise engine temperature and the three wheel-temperature groups through saved-capture playback.
 - [ ] Complete exact comparisons with the game's display.
 - [ ] Add automated fixture tests.
 - [ ] Build the desktop interface.
 
-Before engine temperature was added, the October 20, 2026 playback processed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. This establishes successful playback with plausible values, not complete decoder verification. Reverse is assumed working through signed decoding but was not observed in that capture. Lap progression and full steering travel remain unverified.
+Before engine temperature was added, the October 20, 2026 playback processed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. This establishes successful playback with plausible values, not complete decoder verification, and does not cover any of the temperature additions. Reverse is assumed working through signed decoding but was not observed in that capture. Lap progression and full steering travel remain unverified.
+
+The application calls the specification's `m_tyresInnerTemperature` **tyre core temperature**, following the user's preferred racing terminology.
 
 ## 1. Catalogue the specification
 
@@ -94,4 +97,6 @@ Windows and the 2026 packet format are the initial targets. The roadmap can grow
 
 ## Next milestone task
 
-Run the updated decoder on the existing capture, confirm playback completes, and inspect the new engine-temperature readings. Record observations separately from exact in-game verification. The Car Telemetry inventory is complete; engine temperature is implemented and reviewed but has not yet been exercised through playback.
+Continue coding while the user is away from the game PC. A suggested next lesson is four-wheel tyre pressure: record offset +39, four little-endian floats, 16 bytes total, displayed in PSI. The user writes the implementation.
+
+When capture access is available, run the updated decoder, confirm playback completes, and inspect engine, brake, tyre surface, and tyre core temperatures. Record those observations separately from exact in-game verification. Testing is deferred at the user's request; all four temperature additions are implemented and reviewed but have not yet been exercised through playback.

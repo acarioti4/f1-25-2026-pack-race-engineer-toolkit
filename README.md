@@ -8,7 +8,7 @@ The current prototype records UDP packets and decodes selected player telemetry 
 
 - Record raw game UDP packets with receive timestamps.
 - Read saved captures and display packet metadata and selected player values.
-- Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets.
+- Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets, plus brake, tyre surface, and tyre core temperatures for all four player wheels.
 - Decode current lap time, race position, and lap number from Lap Data packets.
 - Identify packet types 0–16; payload decoding currently covers selected fields in packet types 2 and 6.
 - Check capture boundaries, packet headers, the 2026 format, and supported versions and player indices for the implemented packet types.
@@ -68,9 +68,14 @@ Only the player car's selected fields are currently decoded.
 | Car Telemetry (6) | Engine speed | RPM |
 | Car Telemetry (6) | Steering | -1 = left, +1 = right |
 | Car Telemetry (6) | Engine temperature | Degrees Celsius |
+| Car Telemetry (6) | Brake temperatures | Degrees Celsius, all four wheels |
+| Car Telemetry (6) | Tyre surface temperatures | Degrees Celsius, all four wheels |
+| Car Telemetry (6) | Tyre core temperatures | Degrees Celsius, all four wheels |
 | Lap Data (2) | Current lap time | Seconds, converted from milliseconds |
 | Lap Data (2) | Race position | Position number |
 | Lap Data (2) | Current lap number | Lap number |
+
+Wheel temperatures are displayed in left rear (LR), right rear (RR), left front (LF), right front (RF) order. The application uses **core temperature** to match the user's preferred racing terminology; this maps to `m_tyresInnerTemperature` in the UDP specification.
 
 ## Validation and limitations
 
@@ -78,7 +83,7 @@ Before engine temperature was added, an October 20, 2026 capture playback proces
 
 These results demonstrate successful playback with plausible values; exact comparisons with the game's display remain incomplete. Reverse uses signed gear decoding and is assumed working, but was not observed in that capture. Lap progression and full steering travel also remain unverified.
 
-Engine temperature is implemented for the player car, reviewed against the specification, and syntax-checked. Playback of this addition, fixture testing, and comparison with the game remain pending.
+Engine temperature and the four-wheel brake, tyre surface, and tyre core temperatures are implemented for the player car. Layout review against the specification and Python syntax checking passed. Playback of these additions, fixture testing, and comparison with the game remain pending; the earlier capture results do not cover them.
 
 There is no automated test suite yet. Synthetic fixtures, malformed-input tests, other car indices, and restricted-data handling still need coverage. Malformed captures, unsupported formats, and unsupported versions of the implemented packet types currently stop the offline decoder with an error.
 
