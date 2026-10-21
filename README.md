@@ -103,7 +103,7 @@ See [ROADMAP.md](ROADMAP.md) for milestones, progress, and completion criteria.
 - Build a PySide6 interface with live telemetry, capture playback, a searchable field browser, and selectable dashboards.
 - Add automated fixture and state checks, complete game comparisons, and package for Windows with PyInstaller.
 
-The initial focus is Windows and the 2026 packet format. Future directions may include cloud services, support for other protocol years, and race-strategy predictions as the project develops.
+The initial focus is Windows and the 2026 packet format. Future directions may include support for other protocol years, cloud services, and race-strategy predictions as the project develops.
 
 ## License
 
