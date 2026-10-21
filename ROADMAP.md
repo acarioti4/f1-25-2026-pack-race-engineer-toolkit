@@ -1,0 +1,95 @@
+# Roadmap
+
+The goal is a Windows desktop application built with Python and PySide6 that exposes every field available through **F1 25: 2026 Season Pack UDP specification v1.2**, across all available cars and packet types 0–16.
+
+This is a hobby learning project. Milestones describe the intended development order, with no fixed release dates. See the [README](README.md) for setup instructions and current features.
+
+## Current progress
+
+- [x] Record raw UDP packets with receive timestamps.
+- [x] Read saved captures and identify packet types 0–16.
+- [x] Decode player speed, signed gear, throttle, brake, RPM, and steering.
+- [x] Decode player current lap time, race position, and lap number.
+- [x] Exercise the implemented fields through saved game-capture playback.
+- [ ] Complete exact comparisons with the game's display.
+- [ ] Add automated fixture tests.
+- [ ] Build the desktop interface.
+
+The October 20, 2026 playback processed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. This establishes successful playback with plausible values, not complete decoder verification. Reverse is assumed working through signed decoding but was not observed in that capture. Lap progression and full steering travel remain unverified.
+
+## 1. Catalogue the specification
+
+- [ ] Start with a complete Car Telemetry inventory, including every per-car record field and packet trailing field.
+- [ ] Record specification names, types, offsets, units, array ordering, and availability rules.
+- [ ] Track implementation, specification review, fixture testing, and game verification as separate statuses.
+- [ ] Extend the inventory to every packet type, header field, event variant, and lookup table.
+
+**Completion criteria:** Every documented field has an inventory entry, and the existing decoder's coverage and verification gaps are accurately represented.
+
+## 2. Separate the data pipeline
+
+- [ ] Separate UDP reception, capture reading, decoding, and presentation.
+- [ ] Use the same decoder for live packets and saved captures.
+- [ ] Return structured header and payload results rather than printing within parsing logic.
+- [ ] Report malformed and unsupported packets without terminating live reception.
+- [ ] Preserve the existing timestamp–length–payload capture format.
+
+**Completion criteria:** Decoding works independently of networking and PySide6, and live reception and playback can feed the same downstream data path.
+
+## 3. Complete documented decoding
+
+- [ ] Expand Car Telemetry and Lap Data to every documented field and available car slot.
+- [ ] Add Session and Participants.
+- [ ] Add Car Status, Car Damage, Car Setups, and Car Telemetry 2.
+- [ ] Add Motion and Motion Ex.
+- [ ] Add Events and every documented event payload variant.
+- [ ] Add Session History, Tyre Sets, and Lap Positions.
+- [ ] Add Final Classification, Lobby Info, and Time Trial.
+- [ ] Handle active counts, player and split-screen indices, and multipart lap-position history.
+- [ ] Preserve unknown enum values and distinguish withheld or unavailable data from genuine zero measurements.
+
+**Completion criteria:** Every field in the specification is accessible through structured results, with mode-specific availability and multiplayer restrictions respected. Implementation coverage remains separate from verification coverage.
+
+## 4. Maintain shared application state
+
+- [ ] Track session identity, car identity, latest values, events, and supplied historical records independently of widgets.
+- [ ] Preserve raw values alongside units and readable labels.
+- [ ] Track receive time, freshness, and availability by data group.
+- [ ] Handle session changes, flashbacks, missing packets, and stale data.
+- [ ] Assemble multipart history without mixing incompatible session data.
+
+**Completion criteria:** Live reception and playback update the same state model, with clear distinctions between current, stale, missing, and restricted data.
+
+## 5. Build the Windows desktop interface
+
+- [ ] Add configurable connection settings, initially using `127.0.0.1:20888`.
+- [ ] Add start/stop controls, capture recording, and saved-capture playback.
+- [ ] Keep reception outside the UI thread with bounded communication to the interface.
+- [ ] Display the currently implemented telemetry and lap fields first.
+- [ ] Add a searchable browser covering every catalogued field, with car selection, values, units, and availability.
+- [ ] Support selectable dashboard fields.
+- [ ] Add timing, tyre/status, and event views using the shared application state.
+
+**Completion criteria:** The interface stays responsive during reception and playback, supports clean shutdown and reconnects, and provides access to every catalogued field.
+
+## 6. Verify and package
+
+Validation should grow alongside each milestone; this final milestone completes coverage and release checks.
+
+- [ ] Add fixtures for layout sizes, signed values, conversions, car indices, event variants, unsupported versions, unknown enums, and malformed captures.
+- [ ] Check session resets, flashbacks, stale data, restricted fields, and multipart history.
+- [ ] Compare decoded values with the game and record remaining verification gaps.
+- [ ] Check interface responsiveness, disconnect/reconnect, playback, and shutdown.
+- [ ] Package the application for Windows with PyInstaller.
+- [ ] Document installation, game settings, capture/playback, and troubleshooting.
+- [ ] Verify the packaged application on Windows without a development Python installation.
+
+**Completion criteria:** Full documented decoding coverage, passing fixture and state checks, recorded game-verification results and gaps, and a working Windows package.
+
+## Scope
+
+Windows and the 2026 packet format are the initial targets. Raw captures stay excluded from Git. Cloud services, other protocol years, and derived race-strategy predictions are outside the current roadmap.
+
+## Next milestone task
+
+Complete the Car Telemetry coverage inventory before extending the decoder: account for every record field and packet trailing field, including type, offset, unit, availability, and separate implementation, review, fixture-test, and game-verification statuses.
