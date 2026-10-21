@@ -8,7 +8,7 @@ The current prototype records UDP packets and decodes selected player telemetry 
 
 - Record raw game UDP packets with receive timestamps.
 - Read saved captures and display packet metadata and selected player values.
-- Decode speed, gear, throttle, brake, RPM, and steering from Car Telemetry packets.
+- Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets.
 - Decode current lap time, race position, and lap number from Lap Data packets.
 - Identify packet types 0–16; payload decoding currently covers selected fields in packet types 2 and 6.
 - Check capture boundaries, packet headers, the 2026 format, and supported versions and player indices for the implemented packet types.
@@ -67,15 +67,18 @@ Only the player car's selected fields are currently decoded.
 | Car Telemetry (6) | Brake | % |
 | Car Telemetry (6) | Engine speed | RPM |
 | Car Telemetry (6) | Steering | -1 = left, +1 = right |
+| Car Telemetry (6) | Engine temperature | Degrees Celsius |
 | Lap Data (2) | Current lap time | Seconds, converted from milliseconds |
 | Lap Data (2) | Race position | Position number |
 | Lap Data (2) | Current lap number | Lap number |
 
 ## Validation and limitations
 
-An October 20, 2026 capture playback processed **71,243 records** without error, including **9,695 Car Telemetry** and **9,695 Lap Data** packets. Observed values included speeds of 0–318 km/h, neutral and forward gears 1–8, a stop in neutral, and simultaneous throttle and brake input.
+Before engine temperature was added, an October 20, 2026 capture playback processed **71,243 records** without error, including **9,695 Car Telemetry** and **9,695 Lap Data** packets. Observed values included speeds of 0–318 km/h, neutral and forward gears 1–8, a stop in neutral, and simultaneous throttle and brake input.
 
 These results demonstrate successful playback with plausible values; exact comparisons with the game's display remain incomplete. Reverse uses signed gear decoding and is assumed working, but was not observed in that capture. Lap progression and full steering travel also remain unverified.
+
+Engine temperature is implemented for the player car, reviewed against the specification, and syntax-checked. Playback of this addition, fixture testing, and comparison with the game remain pending.
 
 There is no automated test suite yet. Synthetic fixtures, malformed-input tests, other car indices, and restricted-data handling still need coverage. Malformed captures, unsupported formats, and unsupported versions of the implemented packet types currently stop the offline decoder with an error.
 
@@ -95,7 +98,7 @@ The reader distinguishes normal end-of-file from truncated timestamps, lengths, 
 
 See [ROADMAP.md](ROADMAP.md) for milestones, progress, and completion criteria.
 
-- Catalogue every documented field, starting with Car Telemetry, and track implementation and validation coverage separately.
+- The [Car Telemetry inventory](CAR_TELEMETRY_INVENTORY.md) is complete. Extend the inventory to other packets and track implementation and validation coverage separately.
 - Separate packet receiving, capture reading, decoding, and presentation into shared components.
 - Expand decoding to all documented fields and available car slots across packet types 0–16.
 - Respect multiplayer restrictions and mode-specific availability, keeping withheld data distinct from measured zero values.

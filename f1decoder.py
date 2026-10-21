@@ -112,7 +112,12 @@ with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
                                 raise ValueError("Telemetry packet is missing player's steering data.")
                             steering = struct.unpack_from("<f", payload, steering_offset)[0]
 
-                            # Present the six player values together for capture inspection.
+                            engine_temp_offset = speed_offset + 38
+                            if len(payload) < engine_temp_offset + 1:
+                                 raise ValueError("Telemetry packet is missing player's engine.temp data.")
+                            engine_temp = payload[engine_temp_offset]
+
+                            # Present the player values together for capture inspection.
                             print(
                                 f"Speed: {speed} km/h | "
                                 f"Gear: {gear} | "
@@ -120,6 +125,7 @@ with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
                                 f"Brake %: {brake} | "
                                 f"RPM: {rpm} | "
                                 f"Steering: {steering} | "
+                                f"Engine Temp: {engine_temp}°C | "
                             )
                         elif packet_id == 2:
                              # Lap Data has its own version and 57-byte per-car layout.

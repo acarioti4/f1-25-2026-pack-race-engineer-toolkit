@@ -10,18 +10,20 @@ This is a hobby learning project. Milestones describe the intended development o
 - [x] Read saved captures and identify packet types 0–16.
 - [x] Decode player speed, signed gear, throttle, brake, RPM, and steering.
 - [x] Decode player current lap time, race position, and lap number.
-- [x] Exercise the implemented fields through saved game-capture playback.
+- [x] Exercise the original six telemetry fields and three lap fields through saved game-capture playback.
+- [x] Add player engine temperature; specification review and syntax check passed.
+- [ ] Exercise engine temperature through saved-capture playback.
 - [ ] Complete exact comparisons with the game's display.
 - [ ] Add automated fixture tests.
 - [ ] Build the desktop interface.
 
-The October 20, 2026 playback processed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. This establishes successful playback with plausible values, not complete decoder verification. Reverse is assumed working through signed decoding but was not observed in that capture. Lap progression and full steering travel remain unverified.
+Before engine temperature was added, the October 20, 2026 playback processed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. This establishes successful playback with plausible values, not complete decoder verification. Reverse is assumed working through signed decoding but was not observed in that capture. Lap progression and full steering travel remain unverified.
 
 ## 1. Catalogue the specification
 
-- [ ] Start with a complete Car Telemetry inventory, including every per-car record field and packet trailing field.
-- [ ] Record specification names, types, offsets, units, array ordering, and availability rules.
-- [ ] Track implementation, specification review, fixture testing, and game verification as separate statuses.
+- [x] Complete the [Car Telemetry inventory](CAR_TELEMETRY_INVENTORY.md), including every per-car record field and packet trailing field.
+- [x] Record Car Telemetry specification names, types, offsets, units, array ordering, and availability rules.
+- [x] Track Car Telemetry implementation, specification review, fixture testing, and game verification as separate statuses.
 - [ ] Extend the inventory to every packet type, header field, event variant, and lookup table.
 
 **Completion criteria:** Every documented field has an inventory entry, and the existing decoder's coverage and verification gaps are accurately represented.
@@ -92,4 +94,4 @@ Windows and the 2026 packet format are the initial targets. The roadmap can grow
 
 ## Next milestone task
 
-Complete the Car Telemetry coverage inventory before extending the decoder: account for every record field and packet trailing field, including type, offset, unit, availability, and separate implementation, review, fixture-test, and game-verification statuses.
+Run the updated decoder on the existing capture, confirm playback completes, and inspect the new engine-temperature readings. Record observations separately from exact in-game verification. The Car Telemetry inventory is complete; engine temperature is implemented and reviewed but has not yet been exercised through playback.
