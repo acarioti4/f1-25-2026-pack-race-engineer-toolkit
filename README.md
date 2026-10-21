@@ -10,6 +10,8 @@ A learning project for a Windows telemetry desktop app using Python and PySide6.
 - Lap Data fields: player current lap time (milliseconds converted to seconds), race position, and lap number.
 - Both Python files include explanatory comments. Other packet types are named but their payload fields are not yet decoded.
 
+The October 20 capture review, comments, and existing local implementation changes were published to `main` in commit `6fa735a`, followed by merge commit `d5675db` to incorporate the existing GitHub history. Captures remain excluded from version control.
+
 ## Run the prototype
 
 Use Python 3; the scripts require only the standard library. In the game enable UDP output, select the 2026 format, and set destination `127.0.0.1:20888` when running on the same PC. The destination must match the receiver settings. The specification's example port 20777 differs from this project's default 20888.
@@ -73,4 +75,4 @@ Begin the coverage inventory with a Car Telemetry table: list every documented r
 5. Build the PySide6 Windows interface with reception outside the UI thread, capture/playback, searchable field access, and selectable dashboards.
 6. Add user-written fixture and state checks, document game-verification gaps, and package with PyInstaller. Verify on Windows without a development Python installation.
 
-See Where We Left Off.md for the session handoff and AGENTS.md for detailed acceptance checks. Cloud services, other protocol years, and derived race-strategy predictions are outside the current roadmap.
+See [Where We Left Off.md](Where%20We%20Left%20Off.md) for the session handoff and [AGENTS.md](AGENTS.md) for collaboration rules and planned acceptance checks. The user continues to write implementation and tests; source comments may be added by the assistant when explicitly requested. Cloud services, other protocol years, and derived race-strategy predictions are outside the current roadmap.

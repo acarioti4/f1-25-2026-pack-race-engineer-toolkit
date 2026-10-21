@@ -13,6 +13,7 @@ The project records UDP packets and decodes player speed, gear, throttle, brake,
 - **The user writes all implementation and test code.** The assistant teaches, helps plan, investigates, and reviews.
 - Do not provide implementation code, copyable solutions, patches, or direct source edits. Conceptual, language-neutral pseudocode is allowed.
 - Documentation edits are allowed when requested; this does not authorize implementation changes.
+- Explanatory comments in existing source are allowed when explicitly requested, as in the October 20, 2026 session. Preserve executable behavior; this does not authorize implementation or test code changes.
 - Give one manageable coding task at a time. Explain its purpose, relevant concepts, specification references, and completion criteria.
 - Let the user attempt the task before offering progressively more detailed hints.
 - Review user-written code with concrete observations and explanations. Describe corrections without writing replacements.
@@ -21,10 +22,18 @@ The project records UDP packets and decodes player speed, gear, throttle, brake,
 - Finish each learning session with completed work, unresolved issues, and one next task. Update handoff documentation when requested.
 - These rules continue across sessions unless the user explicitly changes them.
 
+## Recorded verification status
+
+- Capture playback completed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. The stop in neutral and simultaneous throttle/brake inputs were observed.
+- Reverse is assumed working at the user's request. It was not observed in the capture; do not require another reverse capture as the next task.
+- The burnout was not confirmed from the six decoded telemetry fields. Lap values, lap progression, and full steering travel retain game-verification gaps.
+- Both source files contain explanatory comments; syntax-tree comparison confirmed that those additions preserved executable behavior. No automated fixture suite exists or was run.
+- The receiver appends captures beside the scripts. Keep raw captures excluded from Git. README.md and Where We Left Off.md hold the detailed observations and current handoff.
+
 ## Implementation roadmap
 
 1. **Establish a coverage inventory and extend the current decoder.**
-   Inventory every documented packet, header field, payload field, event variant, and lookup table. Track decoding and verification status separately. Continue with player current lap time, position, and lap number, one field at a time. Validate the existing six telemetry values using a capture before relying on them in the UI.
+   Inventory every documented packet, header field, payload field, event variant, and lookup table. Track decoding and verification status separately. The six player telemetry fields and player current lap time, position, and lap number are implemented and have been exercised through capture playback. Start the inventory with Car Telemetry, then extend decoding one field at a time. Preserve the distinction between plausible capture observations and exact comparisons with the game.
 
 2. **Separate receiving, capture reading, decoding, and presentation.**
    Refactor the user’s code into independently understandable components. Live packets and saved captures must use the same decoder. Preserve the existing timestamp–length–payload capture format. Return structured results rather than printing inside parsing logic; report malformed or unsupported packets without terminating live reception.
@@ -41,7 +50,7 @@ The project records UDP packets and decodes player speed, gear, throttle, brake,
 6. **Package and verify the application.**
    Package with PyInstaller for Windows. Document game settings, launching, capture/playback, and troubleshooting. Verify operation on a Windows machine without a development Python installation.
 
-## Interfaces and acceptance checks
+## Planned interfaces and acceptance checks
 
 - The decoder accepts packet bytes and produces structured header/payload data or a diagnostic; it does not depend on networking or PySide6.
 - A field catalog connects specification names, packet identity, units, labels, and availability to the data browser.
@@ -51,7 +60,7 @@ The project records UDP packets and decodes player speed, gear, throttle, brake,
 - Desktop checks cover responsiveness, disconnect/reconnect, playback, shutdown, and access to every catalogued field.
 - Completion requires full documented decoding coverage, fixture checks, and clearly recorded game verification gaps.
 
-## Defaults and first learning task
+## Defaults and next learning task
 
 Retain `127.0.0.1:20888` as the initial configurable receiver address. Target Windows first; cloud services, other protocol years, and derived race-strategy predictions are outside this roadmap.
 

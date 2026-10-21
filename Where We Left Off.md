@@ -13,6 +13,8 @@ The user writes implementation and test code. The assistant teaches, investigate
 - Car Telemetry decoding covers player speed, signed gear, throttle percentage, brake percentage, RPM, and steering. Player record start: 29 + index * 59.
 - Lap Data decoding covers current lap time (unsigned 32-bit milliseconds at record +4, displayed as seconds), position (byte +32), and lap number (byte +33). Player record start: 29 + index * 57.
 - Added comments explaining capture framing, offsets, types, conversions, bounds checks, output, and socket/file lifecycle. Syntax-tree comparison confirms these comments preserve executable behavior.
+- Published the capture review, comments, documentation, and pending local project changes in commit `6fa735a`. Incorporated the existing remote history with merge commit `d5675db` and pushed it to `origin/main` successfully. The raw capture was excluded.
+- Synchronized AGENTS.md and the other Markdown files: Lap Data is implemented, capture playback is complete, reverse is assumed working, and the next task is the coverage inventory. The standing user-written implementation/test rule remains in effect; requested source comments are a limited exception.
 
 ## Game-capture check
 
