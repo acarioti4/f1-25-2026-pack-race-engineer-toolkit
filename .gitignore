@@ -11,3 +11,6 @@ venv/
 .env
 .env.*
 !.env.example
+
+# Private collaboration instructions
+AGENTS.md

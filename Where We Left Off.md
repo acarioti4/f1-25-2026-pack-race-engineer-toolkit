@@ -8,7 +8,7 @@ Build the F1 25 (2026 Pack) Race Engineer Toolkit together, with you writing the
 
 ## Current progress
 
-The project currently has a UDP packet receiver in `udpreceiver.py` and a capture reader/early decoder in `f1decoder.py`. There is not yet a desktop UI. The latest decoder changes are committed locally on the `main` branch.
+The project currently has a UDP packet receiver in `udpreceiver.py` and a capture reader/early decoder in `f1decoder.py`. There is not yet a desktop UI. The published decoder currently contains Car Telemetry decoding. The user completed the Lap Data additions in their local VSCode copy during this session, but that saved file is not yet available in this cloud workspace or on GitHub. Sync the local file before publishing the decoder changes.
 
 In `f1decoder.py`, we have worked through:
 
@@ -27,22 +27,31 @@ In `f1decoder.py`, we have worked through:
 - Decoding steering as a float from -1.0 (left) to +1.0 (right), with a length check for the bytes at the steering offset.
 - The Car Telemetry decoding has had a Python syntax check, but has not yet been checked against a live game capture; testing is intentionally deferred.
 
-## Next coding step: begin Lap Data decoding
+## Lap Data work completed in the local VSCode copy
 
-Add player lap information from Lap Data packets (packet ID `2`). This is a different packet layout from Car Telemetry.
+We reviewed these additions one field at a time for Lap Data packets (ID `2`, version `1`):
 
-- The packet header is 29 bytes. It contains 24 packed 57-byte Lap Data records, one per car.
-- Use the player car index from header byte `27` to find the player's record: start at byte `29`, then skip `player_index * 57` bytes. Do not reuse Car Telemetry's 59-byte record size.
-- A useful first value is current lap time: it is a little-endian unsigned 32-bit millisecond value at offset `+4` within the player's record.
-- Position is a byte at record offset `+32`; current lap number is a byte at offset `+33`.
-- Check that the payload contains the field being read before decoding it. The Lap Data packet version in the supplied specification is `1`.
+- Find the player's record using header byte `27`: `29 + player_index * 57`.
+- Read current lap time as an unsigned little-endian 32-bit value at record offset `+4`. Divide milliseconds by **1,000** to get seconds; display with three decimal places.
+- Read race position as a single unsigned byte at record offset `+32`.
+- Read current lap number as a single unsigned byte at record offset `+33`.
+- Check that the payload contains each complete field before reading it.
 
-Add one field at a time and review each change. Keep using the supplied packet specification to verify offsets, types, units, and vehicle indices. Test against a game capture later, as planned.
+The user confirmed correcting the lap-time divisor to 1,000. The complete saved branch and three-decimal formatting still need review after syncing the local file. No syntax check of that saved file or game-capture validation has been performed here.
+
+## Next steps
+
+1. Sync the user's saved `f1decoder.py` from VSCode into this workspace. Review the complete Lap Data branch, including indentation, version-error wording, seconds conversion, and display precision.
+2. Run a Python syntax check and publish the decoder changes. Do not add new decoding code on the user's behalf.
+3. Refactor Car Telemetry decoding into a function, then Lap Data decoding, one small change at a time.
+4. Return named values in dictionaries so capture reading, printing, and the future UI can use the same parsing functions.
+
+The user writes the code; the assistant explains and reviews without supplying code unless explicitly requested. Keep using the supplied specification to verify layouts. Game-capture validation remains deferred until the user is ready.
 
 ## Remaining roadmap
 
-1. Add Lap Data current lap time, position, and lap number; later verify decoded values against a game capture.
-2. Refactor packet parsing into small functions and keep it separate from UDP receiving.
+1. Sync, review, and publish the local Lap Data additions; verify decoded values against a game capture when ready.
+2. Refactor packet parsing into small functions that return structured values, separate from capture reading and UDP receiving.
 3. Choose a Python desktop UI framework and display live values with connection/freshness status.
 4. Run the receiver and dashboard together, then add more telemetry views.
 
