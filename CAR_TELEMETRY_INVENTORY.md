@@ -45,6 +45,10 @@ Application terminology: **tyre core temperature** maps to the specification's `
 
 The player decoder reads brake temperatures with `struct.unpack_from("<4H", ...)` and tyre surface/core temperatures with `struct.unpack_from("<4B", ...)`. It checks the field offset plus eight or four bytes respectively, retains each four-value tuple, and indexes it directly in the labelled Celsius output.
 
+The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **Unknown** for unexpected values. Retain the specification name in protocol references and respect this display preference. Raw DRS and surface IDs remain in variables but are not printed. Support for the 2025 packet format is much later; the current decoder accepts 2026 only.
+
+The player decoder also reads four pressures as little-endian floats at +39 (16 bytes), and four contact-surface IDs at +55 (4 bytes). Clutch at +14, DRS at +18, and rev-light percentage at +19 each use one unsigned byte with a bounds check. Clutch and rev-light percentage need no multiplication by 100. Fifteen of sixteen player record fields are implemented; individual rev-light bits remain.
+
 ## Whole-packet layout and trailing fields
 
 These offsets count from the start of the UDP packet, excluding the capture file's timestamp and length prefix.
@@ -71,23 +75,23 @@ Reviewed means the layout and meaning were checked against the supplied PDF. It 
 | m_throttle | Player only, displayed as percent | Yes | No | Capture 0-100%; exact game comparison incomplete |
 | m_steer | Player only | Yes | No | Capture approximately -1.00 to +0.73; full travel and exact comparison incomplete |
 | m_brake | Player only, displayed as percent | Yes | No | Capture 0-100%; exact game comparison incomplete |
-| m_clutch | No | Yes | No | Not checked |
+| m_clutch | Player only, percent; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_gear | Player only, signed | Yes | No | Neutral and 1-8 observed; reverse assumed working at user request, not observed; exact comparison incomplete |
 | m_engineRPM | Player only | Yes | No | Capture 3920-13204 RPM; exact game comparison incomplete |
-| m_drs | No | Yes | No | Not checked |
-| m_revLightsPercent | No | Yes | No | Not checked |
+| m_drs | Player only, Closed/Open display; syntax check passed | Yes | No | Playback and game comparison pending |
+| m_revLightsPercent | Player only, percent; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_revLightsBitValue | No | Yes | No | Not checked |
 | m_brakesTemperature | Player only, all four wheels; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_tyresSurfaceTemperature | Player only, all four wheels; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_tyresInnerTemperature | Player only, all four wheels, displayed as core temperature; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_engineTemperature | Player only; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_tyresPressure | No | Yes | No | Not checked |
-| m_surfaceType | No | Yes | No | Not checked |
+| m_tyresPressure | Player only, all four wheels in PSI; syntax check passed | Yes | No | Playback and game comparison pending |
+| m_surfaceType | Player only, all four wheel IDs and name lookup; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_mfdPanelIndex | No | Yes | No | Not checked |
 | m_mfdPanelIndexSecondaryPlayer | No | Yes | No | Not checked |
 | m_suggestedGear | No | Yes | No | Not checked |
 
-Before engine temperature was added, recorded playback processed 71,243 records, including 9,695 Car Telemetry packets. This is evidence of successful playback with plausible values, not complete decoder verification; it does not cover engine temperature or the subsequent brake, tyre surface, and tyre core additions. Other car slots, split-screen behavior, multiplayer availability, malformed inputs, and exact in-game comparisons remain untested or incomplete. The decoder currently checks enough bytes for selected fields, not the complete 1448-byte layout.
+Before engine temperature was added, recorded playback processed 71,243 records, including 9,695 Car Telemetry packets. This is evidence of successful playback with plausible values, not complete decoder verification; it does not cover the temperature, pressure, contact-surface, clutch, DRS, or rev-light-percentage additions. Other car slots, split-screen behavior, multiplayer availability, malformed inputs, and exact in-game comparisons remain untested or incomplete. The decoder currently checks enough bytes for selected fields, not the complete 1448-byte layout.
 
 ## Surface lookup
 
@@ -106,4 +110,4 @@ Before engine temperature was added, recorded playback processed 71,243 records,
 | 10 | Metal |
 | 11 | Ridged |
 
-Unknown IDs should retain their raw value and be labelled unknown when display support is added. No surface lookup is currently implemented.
+The surface lookup is implemented for all four player wheels. Unknown IDs display Unknown; raw IDs remain in the decoded tuple but are not printed. Unknown-value behavior has been reviewed in code, not fixture-tested.

@@ -9,6 +9,7 @@ The current prototype records UDP packets and decodes selected player telemetry 
 - Record raw game UDP packets with receive timestamps.
 - Read saved captures and display packet metadata and selected player values.
 - Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets, plus brake, tyre surface, and tyre core temperatures for all four player wheels.
+- Decode four-wheel tyre pressures and contact-surface names, clutch input, DRS state, and rev-light percentage.
 - Decode current lap time, race position, and lap number from Lap Data packets.
 - Identify packet types 0–16; payload decoding currently covers selected fields in packet types 2 and 6.
 - Check capture boundaries, packet headers, the 2026 format, and supported versions and player indices for the implemented packet types.
@@ -65,17 +66,26 @@ Only the player car's selected fields are currently decoded.
 | Car Telemetry (6) | Gear | Signed value; 0 = neutral, 1–8 = forward gears, -1 = reverse |
 | Car Telemetry (6) | Throttle | % |
 | Car Telemetry (6) | Brake | % |
+| Car Telemetry (6) | Clutch | %, already supplied as 0-100 |
+| Car Telemetry (6) | DRS | Closed/Open; Unknown for unexpected values |
+| Car Telemetry (6) | Rev-light indicator | % |
 | Car Telemetry (6) | Engine speed | RPM |
 | Car Telemetry (6) | Steering | -1 = left, +1 = right |
 | Car Telemetry (6) | Engine temperature | Degrees Celsius |
 | Car Telemetry (6) | Brake temperatures | Degrees Celsius, all four wheels |
 | Car Telemetry (6) | Tyre surface temperatures | Degrees Celsius, all four wheels |
 | Car Telemetry (6) | Tyre core temperatures | Degrees Celsius, all four wheels |
+| Car Telemetry (6) | Tyre pressures | PSI, all four wheels |
+| Car Telemetry (6) | Contact surfaces | Surface names, all four wheels; Unknown for unrecognized IDs |
 | Lap Data (2) | Current lap time | Seconds, converted from milliseconds |
 | Lap Data (2) | Race position | Position number |
 | Lap Data (2) | Current lap number | Lap number |
 
-Wheel temperatures are displayed in left rear (LR), right rear (RR), left front (LF), right front (RF) order. The application uses **core temperature** to match the user's preferred racing terminology; this maps to `m_tyresInnerTemperature` in the UDP specification.
+Wheel temperatures, pressures, and contact surfaces are displayed in left rear (LR), right rear (RR), left front (LF), right front (RF) order. The application uses **core temperature** to match the user's preferred racing terminology; this maps to `m_tyresInnerTemperature` in the UDP specification.
+
+The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **Unknown** for unexpected values. Retain the specification name in protocol references and respect this display preference. Raw DRS and surface IDs remain in variables but are not printed. Support for the 2025 packet format is much later; the current decoder accepts 2026 only.
+
+15 of the 16 fields within the player Car Telemetry record are decoded. Individual rev-light bits, the three trailing packet fields, and other cars remain to be added.
 
 ## Validation and limitations
 
@@ -83,9 +93,17 @@ Before engine temperature was added, an October 20, 2026 capture playback proces
 
 These results demonstrate successful playback with plausible values; exact comparisons with the game's display remain incomplete. Reverse uses signed gear decoding and is assumed working, but was not observed in that capture. Lap progression and full steering travel also remain unverified.
 
-Engine temperature and the four-wheel brake, tyre surface, and tyre core temperatures are implemented for the player car. Layout review against the specification and Python syntax checking passed. Playback of these additions, fixture testing, and comparison with the game remain pending; the earlier capture results do not cover them.
+Engine temperature, four-wheel brake/surface/core temperatures, tyre pressures, contact surfaces, clutch, DRS, and rev-light percentage are implemented, specification-reviewed, and syntax-checked. Playback, fixture testing, and exact game comparisons for these additions remain pending. The earlier capture results do not cover these additions. Comment-only edits were checked by syntax-tree comparison and preserved executable behavior.
 
 There is no automated test suite yet. Synthetic fixtures, malformed-input tests, other car indices, and restricted-data handling still need coverage. Malformed captures, unsupported formats, and unsupported versions of the implemented packet types currently stop the offline decoder with an error.
+
+## Next capture and review
+
+Start the receiver before driving and stop it with Ctrl+C afterward. A varied session with several laps, braking and acceleration, and changes in wing state will give the next review more to inspect. If convenient, note a few in-game readings and when they occurred for comparison. No additional reverse sample is required.
+
+The user plans to collect a longer game capture next. After recording, run the updated decoder, confirm normal completion and the total-record count, and inspect all newly added fields. Record playback observations separately from exact game comparisons. The next coding lesson after capture review is individual rev lights: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; the three packet trailing fields and other car slots are still unimplemented.
+
+Renaming or moving the current capture is optional: recording appends by default. Keep any renamed raw captures outside the repository or explicitly ignored; only `f1_capture.bin` is currently covered by the capture ignore rule.
 
 ## Capture format
 

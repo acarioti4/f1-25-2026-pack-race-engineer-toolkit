@@ -20,7 +20,29 @@ packet_names = {
       13: "Extended Motion", # For player car only
       14: "Time Trial", # Time trial comparison data.
       15: "Lap Positions", # Lap positions on each lap so a chart can be constructed
-      16: "Car Telemetry 2", # Additional telemetry for all cars
+      16: "Car Telemetry 2" # Additional telemetry for all cars
+}
+
+# Surface IDs describe contact at each wheel; the raw IDs are retained below.
+surface_names = {
+     0: "Tarmac",
+     1: "Rumble strip",
+     2: "Concrete",
+     3: "Rock",
+     4: "Gravel",
+     5: "Mud",
+     6: "Sand",
+     7: "Grass",
+     8: "Water",
+     9: "Cobblestone",
+     10: "Metal",
+     11: "Ridged"
+}
+
+# Display preference: Closed/Open labels for the specification field m_drs.
+wing_position = {
+     0: "Closed",
+     1: "Open"
 }
 
 # Read the receiver's timestamp-length-payload records in binary mode.
@@ -100,6 +122,27 @@ with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
                             brake = struct.unpack_from("<f", payload, brake_offset)[0]
                             brake = brake * 100
 
+                            # Clutch is one unsigned byte at +14, already a percentage (0-100).
+                            clutch_offset = speed_offset + 14
+                            if len(payload) < clutch_offset + 1:
+                                 raise ValueError("Telemetry packet is missing player's clutch data.")
+                            clutch = payload[clutch_offset]
+
+                            # m_drs at +18 is one state value, so it needs one dictionary lookup.
+                            # Keep the raw number in drs and label unrecognized values Unknown.
+                            drs_offset = speed_offset + 18
+                            if len(payload) < drs_offset + 1:
+                                 raise ValueError("Telemetry packet is missing player's wing data.")
+                            drs = payload[drs_offset]
+                            drs_state = wing_position.get(drs, "Unknown")
+
+                            # +19 is the supplied rev-light percentage, not a value calculated from RPM.
+                            rev_light_offset = speed_offset + 19
+                            if len(payload) < rev_light_offset + 1:
+                                 raise ValueError("Telemetry packet is missing player's rev light %.")
+                            rev_light = payload[rev_light_offset]
+
+
                             # Engine RPM at +16 is an unsigned 16-bit integer.
                             rpm_offset = speed_offset + 16
                             if len(payload) < rpm_offset + 2:
@@ -112,38 +155,62 @@ with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
                                 raise ValueError("Telemetry packet is missing player's steering data.")
                             steering = struct.unpack_from("<f", payload, steering_offset)[0]
 
+                            # In this specification engine temperature is one byte at +38, in Celsius.
                             engine_temp_offset = speed_offset + 38
                             if len(payload) < engine_temp_offset + 1:
-                                 raise ValueError("Telemetry packet is missing player's engine temp data.")
+                                raise ValueError("Telemetry packet is missing player's engine temp data.")
                             engine_temp = payload[engine_temp_offset]
                             
+                            # Four 2-byte brake temperatures occupy eight bytes at +22.
                             brake_temp_offset = speed_offset + 22
                             if len(payload) < brake_temp_offset + 8:
-                                  raise ValueError("Telemetry packet is missing player's brake temp data.")
+                                raise ValueError("Telemetry packet is missing player's brake temp data.")
                             brake_temps = struct.unpack_from("<4H", payload, brake_temp_offset) # Order is LR, RR, LF, RF.
                             
+                            # Surface and core temperatures each contain four 1-byte Celsius values.
                             surface_temp_offset = speed_offset + 30
                             if len(payload) < surface_temp_offset + 4:
-                                  raise ValueError ("Telemetry packet is missing player's tyre surface temp data.")
+                                raise ValueError ("Telemetry packet is missing player's tyre surface temp data.")
                             t_surface_temps = struct.unpack_from("<4B", payload, surface_temp_offset) # Order is LR, RR, LF, RF.
                             
+                            # Core is our display name for the specification field m_tyresInnerTemperature.
                             core_temp_offset = speed_offset + 34
                             if len(payload) < core_temp_offset + 4:
-                                  raise ValueError("Telemetry packet is missing player's core tyre temp data.")
+                                raise ValueError("Telemetry packet is missing player's core tyre temp data.")
                             t_core_temps = struct.unpack_from("<4B", payload, core_temp_offset) # Order is LR, RR, LF, RF.
+
+                            # Four 4-byte floats at +39 occupy 16 bytes; pressures arrive in PSI.
+                            t_pressure_offset = speed_offset + 39
+                            if len(payload) < t_pressure_offset + 16:
+                                raise ValueError("Telemetry packet is missing player's tyre pressure data.")
+                            tyre_pressures = struct.unpack_from("<4f", payload, t_pressure_offset) # Order is LR, RR, LF, RF.
+
+                            # Four surface IDs at +55 follow the same LR, RR, LF, RF wheel order.
+                            contact_surface_offset = speed_offset + 55
+                            if len(payload) < contact_surface_offset + 4:
+                                 raise ValueError("Telemetry packet is missing player's tyre contact surface data.")
+                            t_contact_surface = struct.unpack_from("<4B", payload, contact_surface_offset)
+                            # Unlike the single DRS state, each of the four IDs needs its own lookup.
+                            surface_name = [surface_names.get(surface_id, "Unknown") for surface_id in t_contact_surface]
+
 
                             # Present the player values together for capture inspection.
                             print(
                                 f"Speed: {speed} km/h | "
                                 f"Gear: {gear} | "
-                                f"Throttle %: {throttle} | "
-                                f"Brake %: {brake} | "
+                                f"Throttle %: {throttle}% | "
+                                f"Brake %: {brake}% | "
+                                f"Clutch %: {clutch}% | "
                                 f"RPM: {rpm} | "
+                                f"Rev Light %: {rev_light}% | "
                                 f"Steering: {steering} | "
+                                f"DRS: {drs_state} | "
                                 f"Engine Temp: {engine_temp}°C | "
                                 f"Brake Temps: LR - {brake_temps[0]}°C | RR - {brake_temps[1]}°C | LF - {brake_temps[2]}°C | RF - {brake_temps[3]}°C | "
                                 f"Tyre Surface Temp: LR - {t_surface_temps[0]}°C | RR - {t_surface_temps[1]}°C | LF - {t_surface_temps[2]}°C | RF - {t_surface_temps[3]}°C | "
                                 f"Tyre Core Temp: LR - {t_core_temps[0]}°C | RR - {t_core_temps[1]}°C | LF - {t_core_temps[2]}°C | RF - {t_core_temps[3]}°C | "
+                                f"Tyre Pressure: LR - {tyre_pressures[0]}PSI | RR - {tyre_pressures[1]}PSI | LF - {tyre_pressures[2]}PSI | RF - {tyre_pressures[3]}PSI | "
+                                f"Tyre's Contact Surface: LR - {surface_name[0]} | RR - {surface_name[1]} | LF - {surface_name[2]} | RF - {surface_name[3]} | "
                             )
                             
                         elif packet_id == 2:
