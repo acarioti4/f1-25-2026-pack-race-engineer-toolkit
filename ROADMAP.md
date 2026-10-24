@@ -6,6 +6,14 @@ This is a hobby learning project. Milestones describe the intended development o
 
 ## Current progress
 
+October 23 completed lesson: the user moved length-prefixed zlib writing and reading into `capture_io.py`, imported those functions into the receiver and decoder, and wrote a permanent `check_round_trip` using them. Direct execution printed `Success!`, confirming exact-byte recovery of two different complete records and normal EOF; the publication review repeated the same check successfully. All three Python files pass syntax checking. The module's direct-run condition prevents imports from running the check. Full compressed game-capture playback, legacy detection, storage versioning, multi-record blocks, and archives remain unfinished. Earlier assistant comment-only syntax-tree checks are historical and do not cover the later user-written refactor.
+
+Roadmap review: this is partial progress on milestone 2 and the first storage verification in 2A. The overall Windows/PySide6 and full 2026 packet coverage goal remains unchanged. The sequence remains storage identification and compatibility, defensive reads and blocks, minimum session/track/flashback decoding, kept history and archives/catalog, wider decoding, shared application state, UI, and packaging. Full pipeline separation and milestones 2A-2B are not complete.
+
+Six ID dictionaries were added and specification-reviewed. Tracks (28), session types (19), penalties (18), and infringements (55) cover their appendix lists; teams (11 modern 2026 F1 teams) and drivers (30) are partial. Numeric assignments match; infringement labels 16 and 27 need spelling corrections. These tables are not connected to packet decoding, so Session, Participants, and Event coverage is unchanged.
+
+Teaching must explain concepts before assigning edits, remain concise at the user's requested moderate pace, and continue directly in project files. Give connected steps as one manageable lesson rather than requiring a turn for each tiny change. Keep reusable implementation and checks; temporary generated test data is appropriate, disposable practice code is not. The roadmap is planning context, not an engineering assignment for the learner.
+
 - [x] Record raw UDP packets with receive timestamps.
 - [x] Read saved captures and identify packet types 0–16.
 - [x] Decode player speed, signed gear, throttle, brake, RPM, and steering.
@@ -15,10 +23,12 @@ This is a hobby learning project. Milestones describe the intended development o
 - [x] Add brake, tyre surface, and tyre core temperatures for all four player wheels; layout review and syntax check passed.
 - [x] Add four-wheel tyre pressures and contact-surface names; reviewed and syntax-checked.
 - [x] Add clutch, DRS Closed/Open state, and rev-light percentage; reviewed and syntax-checked.
+- [x] Extract shared compressed record reading/writing into `capture_io.py`.
+- [x] Pass the user-written two-record disk round-trip check with exact-byte comparisons and EOF.
 - [ ] Exercise all additions since the original six telemetry fields through saved-capture playback.
 - [ ] Add individual rev-light bits, the remaining field within the player Car Telemetry record.
 - [ ] Complete exact comparisons with the game's display.
-- [ ] Add automated fixture tests.
+- [ ] Add broader automated telemetry, malformed-input, and state tests beyond the storage self-check.
 - [ ] Build the desktop interface.
 
 Before engine temperature was added, the October 20, 2026 playback processed 71,243 records without error, including 9,695 Car Telemetry and 9,695 Lap Data packets. This establishes successful playback with plausible values, not complete decoder verification, and does not cover the temperature, pressure, contact-surface, clutch, DRS, or rev-light-percentage additions. Reverse is assumed working through signed decoding but was not observed in that capture. Lap progression and full steering travel remain unverified.
@@ -38,6 +48,7 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 
 ## 2. Separate the data pipeline
 
+- [x] Extract record compression and disk reading/writing into shared functions used by the scripts and storage check.
 - [ ] Separate UDP reception, capture reading, decoding, and presentation.
 - [ ] Use the same decoder for live packets and saved captures.
 - [ ] Return structured header and payload results rather than printing within parsing logic.
@@ -46,10 +57,63 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 
 **Completion criteria:** Decoding works independently of networking and PySide6, and live reception and playback can feed the same downstream data path.
 
+## 2A. Build compressed recording and kept session history early
+
+**Planning decision: October 22, 2026. Foundation started; block storage and kept history are not implemented.** Build this foundation alongside the pipeline separation, before broad packet expansion and desktop work. Historical storage must support comparing the user's kept laps and sessions by track. "Kept results" includes detailed telemetry from the accepted driving timeline, not just finishing position or summary statistics. Abandoned rewind attempts are excluded from permanent session history.
+
+Current intermediate format compresses one complete record at level 6, prefixes its compressed size with four little-endian bytes, and flushes the file after each write. The two-record check passes, but this is not the planned multi-record, timed-flush design below. Original timestamp-length-payload bytes remain unchanged inside compression. Restoring legacy input support is still required.
+
+Introduce this in manageable lessons:
+
+1. Separate capture input/output from decoding and presentation. Retain legacy uncompressed capture reading and the existing timestamp-length-payload records. Live, legacy, compressed, and archived playback must ultimately feed the same decoder.
+2. Add lossless compression during recording, before waiting for track decoding. Use bounded, independently compressed binary blocks in temporary session storage. The initial design uses zlib/DEFLATE at level 6, with approximately 1 MiB of uncompressed records per block as a starting measurement, not a fixed performance promise. Close blocks on record boundaries and session boundaries; also use a timed flush so sparse traffic does not remain unsaved indefinitely. Benchmark block size, flush interval, and CPU cost with the game running. Do not flush the compressor for every packet or accumulate a whole session in memory.
+3. Bring forward just the shared-header, Session, and Event fields needed for identity and rewind handling: session UID, session time, ordinary and overall frame counters, track/layout and session type, and session-start/end and FLBK events. Consult the supplied specification for exact layouts and availability. Full Session and Event decoding can continue later. Until track identity is known, retain an unclassified temporary session rather than guessing a track.
+4. Build the accepted timeline and minimal shared state before permanent archiving. Then add finalization, track ZIPs, and the catalog described below. Resume individual rev lights and wider packet coverage in manageable lessons; storage must not wait for complete decoding or the UI.
+
+Each temporary block needs a versioned wrapper with its sequence, record count, sizes, checksum, and session/time/frame range. A small index locates blocks without decompressing the entire session. Compression must recover the exact original record bytes; do not round values, downsample, or discard undecoded packet types to save space. Keep packet protocol version and storage format version distinct. Preserve raw availability information and distinguish missing or restricted data from measured zero.
+
+On a confirmed rewind, keep accepted history before the destination and replace the abandoned continuation. Use FLBK's target time/frame within the same session, together with receipt order and the overall frame counter to distinguish repeated attempts. Ordinary frame numbers and session times can repeat. Reject stale or duplicate packets; a lone backwards packet must not trigger destructive trimming. If FLBK is missing, reconcile corroborating evidence and mark uncertainty rather than silently accepting or deleting ambiguous history.
+
+Discard temporary blocks wholly in the abandoned continuation; decompress the boundary block, retain the accepted records, and recompress that portion. Reconcile samples at the destination per packet/data group as resumed packets arrive, avoiding duplicate boundary samples. Repeated or longer rewinds can reach older blocks; do not assume a fixed 15-second history buffer. Rebuild current state, completed laps, events, best laps, and derived summaries so abandoned results cannot survive. Retain only a small rewind/provenance marker if needed, not the abandoned telemetry. Packet bytes themselves remain unchanged; branch metadata governs playback. Validate the precise boundary behavior using real captures and user-written fixtures before enabling removal.
+
+- [ ] Legacy and compressed playback recover identical retained records and decoded values.
+- [x] Two synthetic complete records pass shared-function disk readback and EOF checks.
+- [ ] Compression/decompression checks pass byte-for-byte, including undecoded payloads.
+- [ ] Live recording has bounded memory/queues and measured throughput; report overload or dropped packets.
+- [ ] Test rewinds within/across blocks, across lap boundaries, repeated destinations, duplicate/delayed/missing FLBK, and session changes.
+- [ ] Test interrupted writes, corrupt blocks, recovery, and low disk space. Show space usage and stop cleanly before exhaustion.
+
+**Completion criteria:** Compressed temporary recording and accepted-history playback work without changing legacy capture semantics. Rewinds remove abandoned measurements and results from the accepted history. Implementation, fixture evidence, and game observations remain separately recorded.
+
+## 2B. Finalize completed sessions into track archives
+
+After the session is completed and rewind reconciliation has settled, finalize its kept history. Session end, user stopping capture, a disconnect, and a crash are distinct: an interrupted recording must remain recoverable and explicitly incomplete, not be silently presented as a completed session. Define a bounded end-of-session settling policy for late result packets and mode-specific absence of final classification.
+
+The permanent layout is one ZIP per track/layout containing uniquely named session entries, for example a session directory with a binary capture, metadata, and summary. Include date, session type, and a unique recording identity so repeated sessions never overwrite one another. Use stable track/layout identity for grouping and readable names for display. Unknown track IDs remain explicitly unclassified. Separate incompatible protocol/game formats in metadata and comparisons.
+
+**Compression lifecycle:**
+
+1. During recording, write the independently compressed temporary blocks described in milestone 2A. Rewind edits operate on these blocks, not on the permanent track ZIP.
+2. After completion, stream the accepted blocks through decompression into a new session capture entry in the track ZIP. Use ZIP DEFLATE compression, initially level 6. The ZIP writer recompresses the original binary records as they stream through it. No full uncompressed session file is needed on disk or in memory.
+3. Store metadata and summaries as additional ZIP entries. Do not wrap sessions in nested ZIPs or put already-compressed temporary blocks through a second compression layer; the permanent ZIP supplies the compression.
+4. Close and verify the archive's new entries, record counts, checksums, and readback before marking the session archived. Retain temporary data until the archive and catalog update are confirmed; cleanup follows successful finalization.
+
+Archive writes must be recoverable and must preserve existing sessions. Decide and test the ZIP append/recovery strategy before implementation; replacement or deletion of existing entries can require rebuilding a large track archive. Budget free space for temporary data plus archive growth and any rebuild. Streamed compression avoids a full raw copy but does not remove that space requirement. If finalization fails, leave the temporary session recoverable and do not publish a successful catalog entry. Retry must not duplicate a session.
+
+Maintain a small catalog outside the ZIPs for quick browsing: stable session identity, track/layout, date, session type, completion status, archive entry location, format versions, summary statistics, and available comparison context such as car, weather, tyres, and assists. Keep corresponding metadata inside the ZIP so the catalog can be rebuilt. Catalog technology is an implementation choice, not yet selected. Load detailed telemetry on demand through the shared playback path; derive summaries only from kept history and preserve missing-data indicators. CSV is an optional export format, not the primary recording format.
+
+- [ ] Archive only kept history; verify no abandoned telemetry, lap completion, event, or best-lap result remains.
+- [ ] Archive playback matches the finalized temporary session, including packets not yet decoded.
+- [ ] Test two sessions at the same track, multiple layouts, unknown tracks, and repeated session names.
+- [ ] Test archive failure, retry, catalog reconstruction, and recovery without damaging older sessions.
+- [ ] Browse summaries without decompressing every track archive; load selected laps/sessions for comparison.
+
+**Completion criteria:** Completed sessions are compressed into their track archives, remain replayable, and are discoverable through a rebuildable catalog. No permanent archive feature is considered complete until failure recovery and legacy playback checks pass.
+
 ## 3. Complete documented decoding
 
 - [ ] Expand Car Telemetry and Lap Data to every documented field and available car slot.
-- [ ] Add Session and Participants.
+- [ ] Complete Session and Participants; the minimum header/Session/Event fields needed by milestones 2A-2B come first.
 - [ ] Add Car Status, Car Damage, Car Setups, and Car Telemetry 2.
 - [ ] Add Motion and Motion Ex.
 - [ ] Add Events and every documented event payload variant.
@@ -67,6 +131,7 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 - [ ] Track receive time, freshness, and availability by data group.
 - [ ] Handle session changes, flashbacks, missing packets, and stale data.
 - [ ] Assemble multipart history without mixing incompatible session data.
+- [ ] Extend the minimal session/rewind state from milestone 2A rather than creating a separate historical state path.
 
 **Completion criteria:** Live reception and playback update the same state model, with clear distinctions between current, stale, missing, and restricted data.
 
@@ -79,6 +144,7 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 - [ ] Add a searchable browser covering every catalogued field, with car selection, values, units, and availability.
 - [ ] Support selectable dashboard fields.
 - [ ] Add timing, tyre/status, and event views using the shared application state.
+- [ ] Add a track/session history browser and lap/session comparisons backed by the catalog and kept telemetry; show conditions and missing data when comparing results.
 
 **Completion criteria:** The interface stays responsive during reception and playback, supports clean shutdown and reconnects, and provides access to every catalogued field.
 
@@ -102,6 +168,14 @@ Windows and the 2026 packet format are the initial targets. The roadmap can grow
 
 ## Next milestone task
 
-The user plans to collect a longer game capture next. After recording, run the updated decoder, confirm normal completion and the total-record count, and inspect all newly added fields. Record playback observations separately from exact game comparisons. The next coding lesson after capture review is individual rev lights: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; the three packet trailing fields and other car slots are still unimplemented.
+**Completed October 23:** shared storage functions and a permanent disk round-trip check in `capture_io.py`. It writes complete records of 15 and 17 bytes to ignored `compression_roundtrip.bin`, closes/reopens the file, compares each restored record with its original, and checks EOF. Running `python -B capture_io.py` prints `Success!`. This is storage evidence, not telemetry fixture or game verification; do not reassign it.
+
+**One next lesson:** explain and guide storage identification and versioning in the real capture I/O code. Teach why a file marker identifies the saved layout and why its version differs from the game's packet version. Follow with legacy raw compatibility and append-time format checks so incompatible records cannot be mixed. Account explicitly for today's unversioned experimental format; do not guess from the `.bin` extension or label every unknown file as valid legacy data. The user writes all implementation and test code, extending the existing reusable functions/checks.
+
+Then expand checks to truncated prefixes/contents, invalid zlib data, zero or unreasonable compressed lengths, and restored-size mismatches. Current reads have no explicit size cap and ordinary zlib decompression does not enforce that the entire supplied compressed region is exactly one stream. Address bounded decompression as well. Keep original packet lengths inside compression unchanged. Then continue toward multi-record blocks, bounded memory/timed flushing, minimum session/track/FLBK decoding, kept history, and archives/catalog. Individual rev lights remain queued.
+
+The isolated check is complete. Live recording remains deferred while storage identification/compatibility and a clearly separated recording destination are addressed; the receiver still appends to `f1_capture.bin` without checking an existing file's format. The raw capture name, existing ZIP, and experimental check file are explicitly ignored. Add ignore coverage for future storage paths when introduced. The user writes all implementation and test code.
+
+The October 22 storage priority still governs the sequence. Shared compressed record I/O and the two-record disk check are complete; storage identification/versioning and legacy compatibility come next. Continue pipeline separation, then bring forward the minimum session/track and flashback fields needed for kept history and completed-session archiving; see ROADMAP.md milestones 2A-2B. Individual rev lights remain queued: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; trailing fields and other car slots remain unimplemented. Keep storage-check evidence, capture observations, exact game comparisons, and telemetry fixture checks distinct.
 
 Engine temperature, four-wheel brake/surface/core temperatures, tyre pressures, contact surfaces, clutch, DRS, and rev-light percentage are implemented, specification-reviewed, and syntax-checked. Playback, fixture testing, and exact game comparisons for these additions remain pending.

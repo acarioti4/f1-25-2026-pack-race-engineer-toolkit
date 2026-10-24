@@ -1,6 +1,8 @@
 # struct reads binary floating-point fields; Path locates the capture beside this script.
+# zlib restores each compressed record before its original fields are selected.
 import struct
 from pathlib import Path
+from capture_io import read_record
 
 # Packet IDs identify layouts, not individual cars. Only IDs 2 and 6 are decoded below.
 packet_names = {
@@ -21,6 +23,110 @@ packet_names = {
       14: "Time Trial", # Time trial comparison data.
       15: "Lap Positions", # Lap positions on each lap so a chart can be constructed
       16: "Car Telemetry 2" # Additional telemetry for all cars
+}
+
+# Future Session lookup; currently unused. Unknown track -1 needs handling when connected.
+track_id = {
+     0: "Melbourne",
+     2: "Shanghai",
+     3: "Sakhir (Bahrain)",
+     4: "Catalunya",
+     5: "Monaco",
+     6: "Montreal",
+     7: "Silverstone",
+     9: "Hungaroring",
+     10: "Spa",
+     11: "Monza",
+     12: "Singapore",
+     13: "Suzuka",
+     14: "Abu Dhabi",
+     15: "Texas",
+     16: "Brazil",
+     17: "Austria",
+     19: "Mexico",
+     20: "Baku (Azerbaijan)",
+     26: "Zandvoort",
+     27: "Imola",
+     29: "Jeddah",
+     30: "Miami",
+     31: "Las Vegas",
+     32: "Losail",
+     39: "Silverstone (Reverse)",
+     40: "Austria (Reverse)",
+     41: "Zandvoort (Reverse)",
+     42: "Madrid"
+}
+
+# Partial lookup for modern 2026 F1 teams; currently unused by decoding.
+team_id = { # 2026 Teams
+     476: "Mercedes", 
+     477: "Ferrari",
+     478: "Red Bull",
+     479: "Williams",
+     480: "Aston Martin",
+     481: "Alpine",
+     482: "Racing Bulls",
+     483: "Haas",
+     484: "McLaren",
+     485: "Audi",
+     486: "Cadillac"
+}
+
+# Selected driver IDs, not the full specification table; currently unused.
+driver_id = {
+     0: "Carlos Sainz",
+     2: "Daniel Ricciardo",
+     3: "Fernando Alonso",
+     4: "Felipe Massa",
+     7: "Lewis Hamilton",
+     9: "Max Verstappen",
+     10: "Nico Hülkenberg",
+     11: "Kevin Magnussen",
+     14: "Sergio Pérez",
+     15: "Valtteri Bottas",
+     17: "Esteban Ocon",
+     19: "Lance Stroll",
+     50: "George Russell",
+     54: "Lando Norris",
+     58: "Charles Leclerc",
+     59: "Pierre Gasly",
+     62: "Alex Albon",
+     77: "Ayrton Senna",
+     80: "Guanyu Zhou",
+     90: "Michael Schumacher",
+     94: "Yuki Tsunoda",
+     109: "Jenson Button",
+     112: "Oscar Piastri",
+     113: "Liam Lawson",
+     147: "Oliver Bearman",
+     149: "Isack Hadjar",
+     161: "Gabriel Bortoleto",
+     162: "Franco Colapinto",
+     165: "Andrea-Kimi Antonelli",
+     188: "Arvid Lindblad"
+}
+
+# Future Session lookup; defining names does not yet decode Session packets.
+session_type = {
+     0: "Unknown",
+     1: "Practice 1",
+     2: "Practice 2",
+     3: "Practice 3",
+     4: "Short Practice",
+     5: "Qualifying 1",
+     6: "Qualifying 2",
+     7: "Qualifying 3",
+     8: "Short Qualifying",
+     9: "One-Shot Qualifying",
+     10: "Sprint Shootout 1",
+     11: "Sprint Shootout 2",
+     12: "Sprint Shootout 3",
+     13: "Short Sprint Shootout",
+     14: "One-Shot Sprint Shootout",
+     15: "Race",
+     16: "Race 2",
+     17: "Race 3",
+     18: "Time Trial"
 }
 
 # Surface IDs describe contact at each wheel; the raw IDs are retained below.
@@ -45,32 +151,118 @@ wing_position = {
      1: "Open"
 }
 
-# Read the receiver's timestamp-length-payload records in binary mode.
+# Future Event lookup; currently unused by decoding.
+penalty_type = {
+     0: "Drive through",
+     1: "Stop & Go",
+     2: "Grid penalty",
+     3: "Penalty reminder",
+     4: "Time penalty",
+     5: "Warning",
+     6: "Disqualified",
+     7: "Removed from formation lap",
+     8: "Parked too long timer",
+     9: "Tyre regulations",
+     10: "This lap invalidated",
+     11: "This and next lap invalidated",
+     12: "This lap invalidated without reason",
+     13: "This and next lap invalidated without reason",
+     14: "This and previous lap invalidated",
+     15: "This and previous lap invalidated without reason",
+     16: "Retired",
+     17: "Black flag timer"
+}
+
+# Future Event lookup. Braces in these ordinary strings remain literal characters.
+infringement_type = {
+     0: "Blocking by slow driving",
+     1: "Blocking by wrong way driving",
+     2: "Reversing off the start line",
+     3: "Big Collision",
+     4: "Small Collision",
+     5: "Collision: failed to hand back single position",
+     6: "Collision: failed to hand back multiple positions",
+     7: "Corner cutting: gained time",
+     8: "Corner cutting: single overtake",
+     9: "Corner cutting: multiple overtakes",
+     10: "Crossed pit exit lane",
+     11: "Ignoring blue flags",
+     12: "Ignoring yellow flags",
+     13: "Ignoring drive through",
+     14: "Too many drive throughs",
+     15: "Drive through reminder, serve within {n} laps",
+     16: "Drive through reminder, server this lap",
+     17: "Pit lane speeding",
+     18: "Parked for too long",
+     19: "Ignoring tyre regulations",
+     20: "Too many penalties",
+     21: "Multiple warnings",
+     22: "Approaching disqualification",
+     23: "Tyre regulations select single",
+     24: "Tyre regulations select multiple",
+     25: "Lap invalidated: Corner cutting",
+     26: "Lap invalidated: Running wide",
+     27: "Curner cutting: Ran wide, gained minor time",
+     28: "Corner cutting: Ran wide, gained significant time",
+     29: "Corner cutting: Ran wide, gained extreme time",
+     30: "Lap invalidated: Wall riding",
+     31: "Lap invalidated: Flashback used",
+     32: "Lap invalidated: Reset to track",
+     33: "Blocking pit lane",
+     34: "Jump start",
+     35: "{Safety Car} Collision",
+     36: "{Safety Car} Illegal overtake",
+     37: "{Safety Car} Exceeding allowed pace",
+     38: "{Virtual Safety Car} Exceeding allowed pace",
+     39: "Formation lap below allowed speed",
+     40: "Formation lap parking",
+     41: "Retired: Mechanical failure",
+     42: "Retired: Terminal damage",
+     43: "{Safety Car} Falling too far back",
+     44: "Black flag timer",
+     45: "Unserved: Stop & Go penalty",
+     46: "Unserved: Drive through penalty",
+     47: "Engine component change",
+     48: "Gearbox change",
+     49: "Parc Fermé change",
+     50: "{League} Grid penalty",
+     51: "Retry penalty",
+     52: "Illegal time gain",
+     53: "Mandatory pitstop",
+     54: "Attribute assigned"
+}
+
+# Experimental input: four-byte compressed size followed by one zlib record, repeated.
+# Legacy raw captures and ZIP archives are not detected or supported by this reader yet.
+# capture stays an open file object; its read calls advance the position on disk.
 with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
     record_counter = 0
     while True:
-        # Each record begins with an 8-byte receive timestamp in Unix nanoseconds.
-        timestamp_bytes = capture.read(8)
-
-        # No bytes means normal EOF; a partial field means an incomplete capture.
-        if timestamp_bytes == b"":
-                break # End of file.
-        elif len(timestamp_bytes) < 8:
-                raise ValueError("Truncated timestamp.")
+        restored_record = read_record(capture)
+        if restored_record is None:
+             break # End of file.
         else:
-            timestamp = int.from_bytes(timestamp_bytes, "little")
+            timestamp_bytes = restored_record[0:8]
+            if timestamp_bytes == b"":
+                raise ValueError("Incomplete record.")
+            elif len(timestamp_bytes) < 8:
+                raise ValueError("Truncated timestamp.")
+            else:
+                timestamp = int.from_bytes(timestamp_bytes, "little")
 
-            # The next 4 bytes say how many bytes belong to this UDP payload.
-            length_bytes = capture.read(4)
+            # Positions 8-11 encode the original UDP payload size, not compressed size.
+            length_bytes = restored_record[8:12]
 
             if len(length_bytes) < 4:
                 raise ValueError("Truncated packet length!")
             else:
                 length = int.from_bytes(length_bytes, "little")
 
-                # Read exactly one datagram before interpreting its game packet layout.
-                payload = capture.read(length)
+                # Select all bytes from position 12 to the end of this restored record.
+                # This does not read from disk or include any later capture records.
+                payload = restored_record[12:]
 
+                # Reject either too few or too many payload bytes for the recorded size.
                 if len(payload) != length:
                         raise ValueError("Truncated packet payload!")
                 else:

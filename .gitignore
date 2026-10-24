@@ -5,6 +5,12 @@ __pycache__/
 # Captured live telemetry is local data, not source
 f1_capture.bin
 
+# Archived telemetry stays local
+f1_capture.zip
+
+# Generated data for the permanent storage round-trip check
+compression_roundtrip.bin
+
 # Local Python environments and secrets
 .venv/
 venv/
