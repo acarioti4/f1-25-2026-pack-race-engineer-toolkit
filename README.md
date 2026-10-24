@@ -1,5 +1,29 @@
 # F1 25 (2026 Pack) Race Engineer Toolkit
 
+## October 24 update — raw reading and explicit reader selection
+
+This is the current status and supersedes older next-task and compatibility notes below. Older dated sections are retained as historical evidence.
+
+The user completed `read_raw_record(capture)` and `read_capture_record(capture, capture_format)` in `capture_io.py`. The raw reader reads eight timestamp bytes, four payload-length bytes, and exactly the decoded payload length; it rejects incomplete fields and returns the original timestamp + length + payload bytes. An empty timestamp read returns `None` at normal EOF. The selector uses `==` to choose `"raw"` or `"compressed"`, calls `read_raw_record` or `read_record`, and returns that reader's result unchanged. Other labels raise `ValueError`. These strings are explicit caller-supplied choices, not automatic file detection.
+
+Verification performed October 24:
+
+- Existing `check_round_trip` and `check_missing_version` both passed again.
+- Both selector branches returned the two known records (timestamps 1000/2000, payloads ABC/DEFGH) byte-for-byte, then returned `None` at EOF.
+- An unknown format label raised `ValueError`.
+- Raw records truncated to 1, 7, 8, 11, 12, and 14 bytes were rejected, covering incomplete timestamps, length fields, and payloads.
+- The raw selector read all **358,583 records**, totalling **363,003,398 bytes**, from `f1_capture.bin` inside the existing `f1_capture.zip`, then reached normal EOF. Each returned record's payload size matched its stored length. SHA-256 over all returned record bytes matched a separate streaming read of the original ZIP entry.
+
+The ZIP entry was streamed directly for this diagnostic; no extraction, source edit, or old-capture modification was needed. The existing checks replaced only ignored `compression_roundtrip.bin`, leaving it with the marker-only missing-version input. The additional checks were run from the terminal and are not a saved regression suite. The user wrote the new implementation; the assistant executed the requested verification.
+
+This verifies storage reading and byte preservation, not F1 field decoding or exact game values. The 358,583-record storage read is distinct from the earlier 71,243-record decoder playback. No decoder playback, live UDP recording, telemetry fixture checks, or new game comparisons ran. The diagnostic use of Python's ZIP reader does not add ZIP input support to the application.
+
+**Next lesson:** connect the completed readers to playback with explicit input-format selection and one-time header handling. Distinguish legacy raw input, unversioned compressed input, and identified version-1 compressed input. For an identified file, read/validate the file header once before using the compressed record reader; do not read the header for every record. Missing identification does not prove a file is raw. Then teach safe append checks and a separate ignored recording destination before resuming live recording.
+
+October 24 publication preparation: explanatory comments were added to the raw reader and format selector at the user's request. Syntax-tree comparison against the pre-comment source confirmed unchanged executable behavior, and all three Python files passed syntax parsing. Captures, generated check data, and private instructions remain Git-ignored.
+
+The receiver and decoder still need this integration. Safe append handling, defensive size/decompression limits, multi-record blocks, kept-history reconciliation, archives, and the catalog remain unfinished. Milestones 2, 2A, and 2B remain incomplete.
+
 ## October 23 end-of-session update: file headers
 
 The user implemented `write_file_header(capture)` and `read_file_header(capture)` in `capture_io.py`. The identified layout starts with the eight literal bytes `F1DVZCAP`, followed by storage version 1 encoded in one byte, then the existing length-prefixed compressed records. This storage version is independent of the game's protocol version. The reader validates the marker and version and returns the decoded integer version, leaving the file at the first record. File opening and closing remain with the caller.
@@ -26,16 +50,17 @@ The decoder opens in binary read mode, reads and checks the outer size prefix, r
 
 The user also wrote `check_round_trip` in the shared module. It writes two different complete records through the actual writer, closes and reopens the isolated file, compares both returned records byte-for-byte, and checks that a third read returns `None`. Running `python -B capture_io.py` printed `Success!` during the lesson and again during the documentation/publication review. The originals are 15 and 17 bytes long, using timestamps 1000/2000 and payloads `ABC`/`DEFGH`. These are synthetic storage inputs, not F1 packets. All three Python files pass syntax checking.
 
-No live recording, full compressed game-capture playback, or telemetry fixture checks ran this session. Legacy raw captures and ZIP archives are not detected or supported by the current reader. The receiver and decoder do not yet use the new shared storage signature/version; do not mix experimental compressed records with old captures sharing the same filename. One stream per record is an intermediate step, not the planned multi-record block implementation.
+No live recording, full compressed game-capture playback, or telemetry fixture checks ran this session. At that earlier checkpoint, legacy raw captures and ZIP archives were not supported. The October 24 shared raw reader is now checked; application integration remains pending. The receiver and decoder do not yet use the new shared storage signature/version; do not mix experimental compressed records with old captures sharing the same filename. One stream per record is an intermediate step, not the planned multi-record block implementation.
 
 The user wrote the implementation and round-trip check; the assistant wrote the missing-version check under a specific user exception. Earlier assistant comment edits preserved the pre-edit syntax trees; that historical check applies to those comments, not to the later user-written refactor. The publication review updates documentation without changing executable source.
 
-The next lesson is legacy raw reading, followed by explicit format selection and safe append handling; shared header functions are complete. See [the handoff](Where%20We%20Left%20Off.md) for the teaching sequence and remaining validation gaps.
+The next lesson is playback integration of explicit format selection and one-time header handling, followed by safe append checks; shared header functions, raw reading, and record selection are complete. See [the handoff](Where%20We%20Left%20Off.md) for the teaching sequence and remaining validation gaps.
 
 ## Features
 
+- Read legacy raw records through the shared raw reader and choose raw/compressed record reading explicitly; playback-script integration remains pending.
 - Save and read complete records through shared length-prefixed zlib functions; the two-record disk check passes, while live use and full game-capture playback remain pending.
-- Display selected values from experimental compressed captures; legacy raw playback worked historically but is not supported by the current reader.
+- Display selected values from experimental compressed captures; legacy raw playback worked historically, and the new shared raw reader still needs connecting to the playback script.
 - Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets, plus brake, tyre surface, and tyre core temperatures for all four player wheels.
 - Decode four-wheel tyre pressures and contact-surface names, clutch input, DRS state, and rev-light percentage.
 - Decode current lap time, race position, and lap number from Lap Data packets.
@@ -139,7 +164,7 @@ There is one repeatable storage self-check, but no broader automated test suite.
 
 The shared writer and reader agree on the experimental format for the two tested records. Live capture is still deferred pending storage identification, compatibility, and a clearly separated recording destination. After that is resolved, a varied session with several laps, braking and acceleration, and changes in wing state will give the next review more to inspect. If convenient, note a few in-game readings and when they occurred for comparison. No additional reverse sample is required.
 
-The October 22 storage priority still governs the sequence. Shared compressed record I/O and the two-record disk check are complete; storage identification/versioning and legacy compatibility come next. Continue pipeline separation, then bring forward the minimum session/track and flashback fields needed for kept history and completed-session archiving; see ROADMAP.md milestones 2A-2B. Individual rev lights remain queued: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; trailing fields and other car slots remain unimplemented. Keep storage-check evidence, capture observations, exact game comparisons, and telemetry fixture checks distinct.
+The October 22 storage priority still governs the sequence. Shared compressed I/O, header functions, raw reading, and explicit record selection are complete, with the October 24 storage evidence recorded above. Playback integration, one-time header handling, and safe append checks come next. Continue pipeline separation, then bring forward the minimum session/track and flashback fields needed for kept history and completed-session archiving; see ROADMAP.md milestones 2A-2B. Individual rev lights remain queued: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; trailing fields and other car slots remain unimplemented. Keep storage-check evidence, capture observations, exact game comparisons, and telemetry fixture checks distinct.
 
 Preserve the existing archive separately from compression experiments; recording still appends by default. `f1_capture.bin`, `f1_capture.zip`, and `compression_roundtrip.bin` are now explicitly ignored by Git. The raw file remains absent. The ZIP was previously inspected: its directory lists one `f1_capture.bin` entry (363,003,398 uncompressed bytes; 67,144,886 compressed bytes), and its integrity check passed. Capture framing and decoded values remain unchecked. Future storage directories and renamed captures need ignore coverage when introduced.
 
@@ -159,7 +184,7 @@ The current reader recognizes normal end-of-file at the outer compressed-size pr
 
 ### Planned historical storage
 
-As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared length-prefixed compressed writer and reader pass the two-record disk check. Broader verification and legacy detection remain pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
+As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared compressed writer and reader pass the two-record disk check. Raw reading and explicit record selection also passed the October 24 checks; application integration and broader verification remain pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
 
 - **While driving:** save binary records in independently compressed temporary blocks using zlib/DEFLATE (initially level 6). Start by measuring approximately 1 MiB blocks, with record/session boundaries and timed flushing. Memory stays bounded and recording does not need space for an entire uncompressed session.
 - **When rewinding:** keep history before the destination and replace the abandoned continuation. Remove affected blocks and rebuild the boundary block; reconcile laps, events, and statistics too. The permanent history contains detailed telemetry from kept driving, not abandoned attempts or just a final score.

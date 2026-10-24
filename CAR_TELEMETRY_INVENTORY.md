@@ -1,5 +1,11 @@
 # Car Telemetry inventory
 
+## Latest storage update — October 24
+
+The user completed the raw record reader and explicit raw/compressed reader selection. Both branches passed exact-byte checks for two synthetic records and normal EOF; unknown format and sampled incomplete raw fields were rejected. Existing header/storage checks also passed. A direct read of the old ZIP entry through the raw selector recovered 358,583 records (363,003,398 bytes), with a matching SHA-256 against the original entry. The archive was not extracted or changed.
+
+These were storage checks, including temporary terminal diagnostics, not telemetry decoding checks or a new saved regression suite. All field coverage and verification statuses below remain unchanged. This storage result is separate from the earlier 71,243-record decoder playback. ZIP input is not integrated into the application. Next: playback format selection and one-time header handling, followed by safe append checks and a separate recording destination. See the current handoff for the game plan.
+
 ## Latest storage update — October 23
 
 Shared marker/version functions and the header-aware two-record check now pass. The assistant added a missing-version rejection check at the user's explicit request; it also passes. These checks concern storage only: all telemetry coverage and verification statuses below remain unchanged. The receiver and decoder do not yet use the new header. Legacy raw compatibility is the next lesson; see the handoff. Earlier storage notes below describe the preceding lesson.

@@ -1,5 +1,29 @@
 # Roadmap
 
+## October 24 update — raw reading and explicit reader selection
+
+This is the current status and supersedes older next-task and compatibility notes below. Older dated sections are retained as historical evidence.
+
+The user completed `read_raw_record(capture)` and `read_capture_record(capture, capture_format)` in `capture_io.py`. The raw reader reads eight timestamp bytes, four payload-length bytes, and exactly the decoded payload length; it rejects incomplete fields and returns the original timestamp + length + payload bytes. An empty timestamp read returns `None` at normal EOF. The selector uses `==` to choose `"raw"` or `"compressed"`, calls `read_raw_record` or `read_record`, and returns that reader's result unchanged. Other labels raise `ValueError`. These strings are explicit caller-supplied choices, not automatic file detection.
+
+Verification performed October 24:
+
+- Existing `check_round_trip` and `check_missing_version` both passed again.
+- Both selector branches returned the two known records (timestamps 1000/2000, payloads ABC/DEFGH) byte-for-byte, then returned `None` at EOF.
+- An unknown format label raised `ValueError`.
+- Raw records truncated to 1, 7, 8, 11, 12, and 14 bytes were rejected, covering incomplete timestamps, length fields, and payloads.
+- The raw selector read all **358,583 records**, totalling **363,003,398 bytes**, from `f1_capture.bin` inside the existing `f1_capture.zip`, then reached normal EOF. Each returned record's payload size matched its stored length. SHA-256 over all returned record bytes matched a separate streaming read of the original ZIP entry.
+
+The ZIP entry was streamed directly for this diagnostic; no extraction, source edit, or old-capture modification was needed. The existing checks replaced only ignored `compression_roundtrip.bin`, leaving it with the marker-only missing-version input. The additional checks were run from the terminal and are not a saved regression suite. The user wrote the new implementation; the assistant executed the requested verification.
+
+This verifies storage reading and byte preservation, not F1 field decoding or exact game values. The 358,583-record storage read is distinct from the earlier 71,243-record decoder playback. No decoder playback, live UDP recording, telemetry fixture checks, or new game comparisons ran. The diagnostic use of Python's ZIP reader does not add ZIP input support to the application.
+
+**Next lesson:** connect the completed readers to playback with explicit input-format selection and one-time header handling. Distinguish legacy raw input, unversioned compressed input, and identified version-1 compressed input. For an identified file, read/validate the file header once before using the compressed record reader; do not read the header for every record. Missing identification does not prove a file is raw. Then teach safe append checks and a separate ignored recording destination before resuming live recording.
+
+October 24 publication preparation: explanatory comments were added to the raw reader and format selector at the user's request. Syntax-tree comparison against the pre-comment source confirmed unchanged executable behavior, and all three Python files passed syntax parsing. Captures, generated check data, and private instructions remain Git-ignored.
+
+The receiver and decoder still need this integration. Safe append handling, defensive size/decompression limits, multi-record blocks, kept-history reconciliation, archives, and the catalog remain unfinished. Milestones 2, 2A, and 2B remain incomplete.
+
 ## October 23 end-of-session update: file headers
 
 The user implemented `write_file_header(capture)` and `read_file_header(capture)` in `capture_io.py`. The identified layout starts with the eight literal bytes `F1DVZCAP`, followed by storage version 1 encoded in one byte, then the existing length-prefixed compressed records. This storage version is independent of the game's protocol version. The reader validates the marker and version and returns the decoded integer version, leaving the file at the first record. File opening and closing remain with the caller.
@@ -63,6 +87,13 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 ## 2. Separate the data pipeline
 
 - [x] Extract record compression and disk reading/writing into shared functions used by the scripts and storage check.
+- [x] Implement shared file marker/version functions and pass the existing header-aware storage checks.
+- [x] Implement raw record reading and explicit raw/compressed record selection.
+- [x] Exercise both selector branches, EOF, unknown labels, and sampled raw truncations in terminal diagnostics.
+- [x] Read the full archived raw capture through the selector and verify returned-byte preservation (358,583 records; no telemetry decoding).
+- [ ] Integrate explicit playback input selection and one-time identified-header validation.
+- [ ] Prevent incompatible appends and use a separate ignored recording destination.
+- [ ] Preserve new reader coverage in permanent user-written regression checks.
 - [ ] Separate UDP reception, capture reading, decoding, and presentation.
 - [ ] Use the same decoder for live packets and saved captures.
 - [ ] Return structured header and payload results rather than printing within parsing logic.
@@ -190,6 +221,6 @@ Then expand checks to truncated prefixes/contents, invalid zlib data, zero or un
 
 The isolated check is complete. Live recording remains deferred while storage identification/compatibility and a clearly separated recording destination are addressed; the receiver still appends to `f1_capture.bin` without checking an existing file's format. The raw capture name, existing ZIP, and experimental check file are explicitly ignored. Add ignore coverage for future storage paths when introduced. The user writes all implementation and test code.
 
-The October 22 storage priority still governs the sequence. Shared compressed record I/O and the two-record disk check are complete; storage identification/versioning and legacy compatibility come next. Continue pipeline separation, then bring forward the minimum session/track and flashback fields needed for kept history and completed-session archiving; see ROADMAP.md milestones 2A-2B. Individual rev lights remain queued: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; trailing fields and other car slots remain unimplemented. Keep storage-check evidence, capture observations, exact game comparisons, and telemetry fixture checks distinct.
+The October 22 storage priority still governs the sequence. Shared compressed I/O, header functions, raw reading, and explicit record selection are complete, with the October 24 storage evidence recorded above. Playback integration, one-time header handling, and safe append checks come next. Continue pipeline separation, then bring forward the minimum session/track and flashback fields needed for kept history and completed-session archiving; see ROADMAP.md milestones 2A-2B. Individual rev lights remain queued: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; trailing fields and other car slots remain unimplemented. Keep storage-check evidence, capture observations, exact game comparisons, and telemetry fixture checks distinct.
 
 Engine temperature, four-wheel brake/surface/core temperatures, tyre pressures, contact surfaces, clutch, DRS, and rev-light percentage are implemented, specification-reviewed, and syntax-checked. Playback, fixture testing, and exact game comparisons for these additions remain pending.
