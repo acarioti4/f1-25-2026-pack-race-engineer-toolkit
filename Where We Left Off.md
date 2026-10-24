@@ -1,8 +1,92 @@
 # Where We Left Off: F1 25 (2026 Pack) Race Engineer Toolkit
 
+## October 23 end-of-session update: file headers
+
+The user implemented `write_file_header(capture)` and `read_file_header(capture)` in `capture_io.py`. The identified layout starts with the eight literal bytes `F1DVZCAP`, followed by storage version 1 encoded in one byte, then the existing length-prefixed compressed records. This storage version is independent of the game's protocol version. The reader validates the marker and version and returns the decoded integer version, leaving the file at the first record. File opening and closing remain with the caller.
+
+The existing two-record disk check now uses these header functions and checks the returned version, both exact-byte record comparisons, and EOF. At the user's explicit request, the assistant implemented `check_missing_version`: it writes only the marker and confirms that reading the incomplete header raises `ValueError`. `python -B capture_io.py` printed both `Success!` and `Missing version correctly rejected!`. The second check replaces the same ignored `compression_roundtrip.bin`, so that generated file ends with only the marker. No real capture or archive was modified.
+
+Publication checks: both storage checks passed again, all three Python files passed syntax parsing, and the syntax tree of `capture_io.py` matched its pre-comment snapshot exactly. The explanatory comments preserve executable behavior. Captures and private instructions remain Git-ignored.
+
+Only the shared module and its checks use the new header so far. The receiver and decoder still use the unversioned compressed arrangement; they do not call the header functions. Legacy raw reading, explicit format selection, safe append checks, and a separate live-recording destination remain unfinished. Live recording stays deferred. Unsupported-version, wrong-marker, and partial-marker rejection are present by source review but have not received dedicated checks. No live UDP, game-capture playback, telemetry fixtures, or new game comparisons ran. Milestones 2, 2A, and 2B remain incomplete.
+
+**Resume with one task:** teach and guide `read_raw_record(capture)` in the shared module. Read eight timestamp bytes (empty means EOF; partial means error), four payload-length bytes, then exactly the decoded payload length. Return the original timestamp bytes + length bytes + payload, preserving the same complete-record result as `read_record`. Keep encoded length bytes separate from the decoded integer count. This was explained but has not been implemented. Then add explicit legacy/raw and unversioned-compressed selection, integrate identified headers, and prevent incompatible appends before continuing pipeline separation. ZIP input remains later work. Do not reassign the completed header or missing-version checks.
+
+The user paused because they were tired and found repeated tiny corrections/checks repetitive. Teach the operation and its values before assigning edits; use connected, manageable chunks and review saved attempts. The user's exception authorized the assistant to write the missing-version check only, not future implementation or tests. The user separately authorized explanatory comments, all documentation updates, and Git publication. Default learning rules still apply; private `AGENTS.md` stays local and ignored.
+
+The following plan and earlier reviews are historical context; the resume task above takes precedence.
+
 **Date:** October 23, 2026 (shared storage functions, successful disk round-trip check, and roadmap/publication review)
 
-## Latest lesson and review — resume here
+## Earlier milestone 2 game plan and lesson plan — retained reference
+
+**Requested October 23:** plan a learning session aimed at finishing step 2 tonight and save the lesson plan here. This section supersedes the earlier next-lesson notes where sequencing differs. It records a plan, not completed implementation. The assistant reviewed the saved `capture_io.py`, `udpreceiver.py`, and `f1decoder.py`; no implementation or test code was changed or run for this planning update.
+
+### Target and game plan
+
+Finish roadmap milestone **2: Separate the data pipeline**, including the storage identification/compatibility groundwork already queued. A pipeline here simply means the steps a packet travels through: obtaining bytes, interpreting them, and displaying the result. Milestones 2A and 2B remain separate: multi-record compression blocks, rewind reconciliation, track archives, and the catalog are later work. Tonight is a target, not a promise about lesson duration; finish based on saved-code review and checks, not the clock.
+
+Current starting point: shared compressed record reading/writing and the two-record disk check are complete. `f1decoder.py` still combines opening the capture, separating timestamp/length/payload, decoding packet fields, and printing. `udpreceiver.py` creates and binds its socket at import time. The existing direct-run condition in `capture_io.py` is the model for controlling when those scripts start.
+
+Work in this order:
+
+1. Identify new capture files and restore an explicit way to read older raw captures, preserving the timestamp-length-payload records. Prevent incompatible appends and keep recording destinations separate from existing captures.
+2. Make the receiver and playback start only when deliberately called, with clear ownership of files and sockets.
+3. Extract packet interpretation into a callable function that accepts only UDP payload bytes and returns named results. Keep capture timestamps outside the game packet decoder.
+4. Move console presentation out of decoding and connect live reception and playback to the same decoding and presentation functions.
+5. Check the separated paths and error handling with permanent user-written checks, then compare the evidence against milestone 2's completion criteria.
+
+Preserve existing field coverage, wheel order, Closed/Open and tyre core terminology, and the default `127.0.0.1:20888`. This is a separation lesson, not a packet-expansion assignment. Keep the PDF as the source of truth whenever constructing F1 test packets or revisiting layout details.
+
+### Teaching sequence
+
+Teach and review one lesson chunk at a time. Each chunk can contain several connected edits; do not require a new prompt for every tiny edit. Explain each new concept before asking the user to apply it. The user writes all implementation and checking code. Do not supply replacement functions, patches, or copyable solutions. Review the saved attempt before advancing; explain the first point of confusion when needed. The following is the instructor's sequence, not a list to hand over as one assignment.
+
+**Lesson 1 — Give saved files an identity.**
+
+- Start with the existing four-byte compressed-size prefix: it describes one record's size but does not identify the file's format. Teach a file header as a label written once at the beginning, distinct from both a record prefix and the game's packet header. Teach the identifying marker first, then the storage version as the number describing our own saved layout; it is independent of the game's 2026 format and packet version.
+- Guide a small documented marker/version design in `capture_io.py`; the instructor explains the layout rather than asking the learner to invent a storage architecture. Extend the existing reusable check to exercise file initialization and recognition while retaining both exact-byte record comparisons and EOF.
+- Once that attempt is understood and reviewed, teach compatibility: a marker identifies new files; lack of a marker does not prove a file is valid legacy data. Provide explicit selection for legacy raw input and today's unversioned compressed experiment, with appropriate record validation. Unknown or unsupported identified formats receive clear errors. ZIP playback remains later work; do not interpret a ZIP as raw records.
+- Teach append checks before writing: initialize an empty/new destination once, accept only the supported identified format for normal recording, and reject incompatible existing contents without changing them. Use a distinct ignored recording destination and protect the old capture/archive. Do not write a header before checking a nonempty file.
+- Success: user-written checks cover recognized format/version, unsupported or incomplete headers, deliberate legacy/experimental reads, and refusal to append to incompatible files without changing their bytes. The original record contents remain identical after readback. This is basic compatibility evidence, not completion of all defensive storage work in 2A.
+
+**Lesson 2 — Decide when a script starts.**
+
+- Start with the user's existing direct-run condition in `capture_io.py`. Explain that importing makes definitions available but currently also executes the receiver's socket setup and the decoder's file-reading loop. A function postpones that work until it is called; the direct-run condition chooses when to call it.
+- Guide moving receiver startup/loop and playback startup/loop into callable entry functions in their real files. Teach passing a capture path or connection setting as an argument using the familiar `write_record(capture, full_packet)` call as the comparison.
+- Explain who opens and closes each resource. Ensure the socket closes even if opening the capture fails after socket creation; do not retain the current gap where only errors inside the receive-loop try block trigger socket cleanup.
+- Success: importing the modules neither binds a port, opens/writes a capture, starts playback, nor prints telemetry. Deliberate execution still starts the chosen operation. Review saved code before any receiver launch; use only an isolated ignored destination for checks.
+
+**Lesson 3 — Return a decoded result instead of printing it.**
+
+- Start at `payload = restored_record[12:]`: these bytes are the same kind of bytes received as `data` by the receiver. Explain that capture timestamp/length handling belongs to capture reading, while interpreting the game's header and fields belongs to a function receiving just those payload bytes.
+- Teach a dictionary as a collection of named results using the user's existing lookup dictionaries as the familiar starting point. Contrast looking up a surface name with returning a collection containing speed, gear, and other values. Explain return values again only as needed: returning a result does not print it or alter the caller's original bytes.
+- First guide extraction using the existing header and speed/gear path, review it, then extend the same understood pattern to all currently implemented telemetry and lap fields. The intermediate extraction is not the final milestone state. Preserve raw values alongside display conversions and labels; do not invent zero-filled fields for packet types that are not decoded.
+- Keep capture-record validation separate and reusable so playback obtains a timestamp and payload without putting disk operations into the packet decoder. A supported but not-yet-decoded packet can return its known metadata with an explicit undecoded status.
+- Success: the decoder accepts packet bytes without a file/socket and returns named header/payload information without printing. All existing decoded fields survive the move. The caller retains the receive timestamp separately.
+
+**Lesson 4 — Connect both sources and keep errors local.**
+
+- Teach presentation as turning those returned values into text, using the existing print statements. Move formatting into a separate callable presentation function; preserve the familiar console output where practical. Both live reception and playback call the same decoder and presenter.
+- Trace one packet through each route in plain language: live reception supplies payload bytes directly; playback first removes the saved timestamp/length wrapper. Recording keeps the original bytes, even for packet types we do not decode yet.
+- Teach catching an expected decoding error at the caller as deciding what happens next. The decoder can raise a specific, understandable error; the live loop reports it and proceeds to the next datagram. Do not catch every possible exception and hide programming mistakes. Treat unsupported format/version explicitly and distinguish it from a known but undecoded packet type.
+- Separate packet errors from storage errors: a malformed game packet must not end reception, but a disk-write failure must not be reported as successful recording. A corrupt capture boundary cannot safely be skipped by guessing where the next record begins; playback should report the problem and stop clearly.
+- Success: both routes use the same interpretation and formatting functions; a bad or unsupported packet followed by a valid packet produces a diagnostic followed by the valid result. Storage failures are reported distinctly.
+
+**Lesson 5 — Demonstrate the complete separation.**
+
+- Explain a controlled test packet as bytes with deliberately known values, extending the reasoning behind the existing ABC/DEFGH storage check. Those old synthetic payloads are useful for storage but are not valid F1 packets. Consult the supplied PDF before guiding real packet fixtures. The user writes permanent checks in the project; generated data is temporary and ignored.
+- Check known results for the currently supported telemetry and lap paths, then save/read the same packet bytes and compare the decoded results with direct decoding. Equality of two paths proves agreement; known expected values are also needed because both paths could share the same mistake.
+- Check quiet imports, unchanged timestamp/length/payload bytes, explicit input-format selection, incompatible append refusal, and malformed/unsupported packet handling followed by a valid packet. Include a bounded local UDP check through the actual receive path, using an isolated ignored capture destination, to establish integration without requiring a game session. Teach its purpose and sender/receiver relationship before assigning it; do not introduce an unexplained testing framework.
+- Review resource cleanup, run the relevant checks, and record precisely which passed. Retain earlier capture observations as historical evidence; synthetic and local UDP checks do not establish exact in-game accuracy or full game-capture performance.
+
+### Completion gate and next handoff
+
+Milestone 2 is complete only when packet decoding operates without networking, capture files, printing, or PySide6; both live and saved inputs feed that same decoder; returned values feed separate presentation; packet errors are reported without stopping live reception; and the original timestamp-length-payload records are preserved. Basic legacy compatibility and safe append handling must also work before normal recording resumes. All existing implemented fields must remain accessible, with the relevant user-written checks passing.
+
+At session end, record completed lessons, saved function/file boundaries, exact checks and results, unresolved issues, and one next task. If the completion gate passes, resume 2A with stronger malformed-input/size/decompression checks and multi-record blocks, followed by minimum session/track/flashback fields. Do not mark 2A or 2B complete as part of finishing milestone 2. If tonight ends earlier, name the first unfinished lesson and resume there without reassigning completed work.
+
+## Latest completed lesson and review — historical starting point
 
 The user completed a lasting storage refactor and check:
 

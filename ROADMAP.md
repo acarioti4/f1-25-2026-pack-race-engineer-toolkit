@@ -1,10 +1,24 @@
 # Roadmap
 
+## October 23 end-of-session update: file headers
+
+The user implemented `write_file_header(capture)` and `read_file_header(capture)` in `capture_io.py`. The identified layout starts with the eight literal bytes `F1DVZCAP`, followed by storage version 1 encoded in one byte, then the existing length-prefixed compressed records. This storage version is independent of the game's protocol version. The reader validates the marker and version and returns the decoded integer version, leaving the file at the first record. File opening and closing remain with the caller.
+
+The existing two-record disk check now uses these header functions and checks the returned version, both exact-byte record comparisons, and EOF. At the user's explicit request, the assistant implemented `check_missing_version`: it writes only the marker and confirms that reading the incomplete header raises `ValueError`. `python -B capture_io.py` printed both `Success!` and `Missing version correctly rejected!`. The second check replaces the same ignored `compression_roundtrip.bin`, so that generated file ends with only the marker. No real capture or archive was modified.
+
+Publication checks: both storage checks passed again, all three Python files passed syntax parsing, and the syntax tree of `capture_io.py` matched its pre-comment snapshot exactly. The explanatory comments preserve executable behavior. Captures and private instructions remain Git-ignored.
+
+Only the shared module and its checks use the new header so far. The receiver and decoder still use the unversioned compressed arrangement; they do not call the header functions. Legacy raw reading, explicit format selection, safe append checks, and a separate live-recording destination remain unfinished. Live recording stays deferred. Unsupported-version, wrong-marker, and partial-marker rejection are present by source review but have not received dedicated checks. No live UDP, game-capture playback, telemetry fixtures, or new game comparisons ran. Milestones 2, 2A, and 2B remain incomplete.
+
+**Resume with one task:** teach and guide `read_raw_record(capture)` in the shared module. Read eight timestamp bytes (empty means EOF; partial means error), four payload-length bytes, then exactly the decoded payload length. Return the original timestamp bytes + length bytes + payload, preserving the same complete-record result as `read_record`. Keep encoded length bytes separate from the decoded integer count. This was explained but has not been implemented. Then add explicit legacy/raw and unversioned-compressed selection, integrate identified headers, and prevent incompatible appends before continuing pipeline separation. ZIP input remains later work. Do not reassign the completed header or missing-version checks.
+
+The user paused because they were tired and found repeated tiny corrections/checks repetitive. Teach the operation and its values before assigning edits; use connected, manageable chunks and review saved attempts. The user's exception authorized the assistant to write the missing-version check only, not future implementation or tests. The user separately authorized explanatory comments, all documentation updates, and Git publication. Default learning rules still apply; private `AGENTS.md` stays local and ignored.
+
 The goal is a Windows desktop application built with Python and PySide6 that exposes every field available through **F1 25: 2026 Season Pack UDP specification v1.2**, across all available cars and packet types 0–16.
 
 This is a hobby learning project. Milestones describe the intended development order, with no fixed release dates. See the [README](README.md) for setup instructions and current features.
 
-## Current progress
+## Earlier progress baseline (see latest update above)
 
 October 23 completed lesson: the user moved length-prefixed zlib writing and reading into `capture_io.py`, imported those functions into the receiver and decoder, and wrote a permanent `check_round_trip` using them. Direct execution printed `Success!`, confirming exact-byte recovery of two different complete records and normal EOF; the publication review repeated the same check successfully. All three Python files pass syntax checking. The module's direct-run condition prevents imports from running the check. Full compressed game-capture playback, legacy detection, storage versioning, multi-record blocks, and archives remain unfinished. Earlier assistant comment-only syntax-tree checks are historical and do not cover the later user-written refactor.
 
@@ -166,7 +180,7 @@ Validation should grow alongside each milestone; this final milestone completes 
 
 Windows and the 2026 packet format are the initial targets. The roadmap can grow as the project develops; cloud services, support for other protocol years, and race-strategy predictions are possible future directions. Raw captures stay excluded from Git.
 
-## Next milestone task
+## Earlier milestone task notes (superseded by the resume task above)
 
 **Completed October 23:** shared storage functions and a permanent disk round-trip check in `capture_io.py`. It writes complete records of 15 and 17 bytes to ignored `compression_roundtrip.bin`, closes/reopens the file, compares each restored record with its original, and checks EOF. Running `python -B capture_io.py` prints `Success!`. This is storage evidence, not telemetry fixture or game verification; do not reassign it.
 

@@ -1,10 +1,24 @@
 # F1 25 (2026 Pack) Race Engineer Toolkit
 
+## October 23 end-of-session update: file headers
+
+The user implemented `write_file_header(capture)` and `read_file_header(capture)` in `capture_io.py`. The identified layout starts with the eight literal bytes `F1DVZCAP`, followed by storage version 1 encoded in one byte, then the existing length-prefixed compressed records. This storage version is independent of the game's protocol version. The reader validates the marker and version and returns the decoded integer version, leaving the file at the first record. File opening and closing remain with the caller.
+
+The existing two-record disk check now uses these header functions and checks the returned version, both exact-byte record comparisons, and EOF. At the user's explicit request, the assistant implemented `check_missing_version`: it writes only the marker and confirms that reading the incomplete header raises `ValueError`. `python -B capture_io.py` printed both `Success!` and `Missing version correctly rejected!`. The second check replaces the same ignored `compression_roundtrip.bin`, so that generated file ends with only the marker. No real capture or archive was modified.
+
+Publication checks: both storage checks passed again, all three Python files passed syntax parsing, and the syntax tree of `capture_io.py` matched its pre-comment snapshot exactly. The explanatory comments preserve executable behavior. Captures and private instructions remain Git-ignored.
+
+Only the shared module and its checks use the new header so far. The receiver and decoder still use the unversioned compressed arrangement; they do not call the header functions. Legacy raw reading, explicit format selection, safe append checks, and a separate live-recording destination remain unfinished. Live recording stays deferred. Unsupported-version, wrong-marker, and partial-marker rejection are present by source review but have not received dedicated checks. No live UDP, game-capture playback, telemetry fixtures, or new game comparisons ran. Milestones 2, 2A, and 2B remain incomplete.
+
+**Resume with one task:** teach and guide `read_raw_record(capture)` in the shared module. Read eight timestamp bytes (empty means EOF; partial means error), four payload-length bytes, then exactly the decoded payload length. Return the original timestamp bytes + length bytes + payload, preserving the same complete-record result as `read_record`. Keep encoded length bytes separate from the decoded integer count. This was explained but has not been implemented. Then add explicit legacy/raw and unversioned-compressed selection, integrate identified headers, and prevent incompatible appends before continuing pipeline separation. ZIP input remains later work. Do not reassign the completed header or missing-version checks.
+
+The user paused because they were tired and found repeated tiny corrections/checks repetitive. Teach the operation and its values before assigning edits; use connected, manageable chunks and review saved attempts. The user's exception authorized the assistant to write the missing-version check only, not future implementation or tests. The user separately authorized explanatory comments, all documentation updates, and Git publication. Default learning rules still apply; private `AGENTS.md` stays local and ignored.
+
 A learning project exploring F1 telemetry with Python. The goal is a Windows desktop app built with PySide6 for viewing the data exposed by **F1 25: 2026 Season Pack UDP specification v1.2**.
 
 The prototype contains selected player telemetry and lap decoding, plus shared compressed capture functions that pass a small, repeatable disk round-trip check. Full compressed game-capture playback remains untested. A desktop interface is planned but is not implemented yet.
 
-## October 23 lesson status
+## Earlier October 23 lesson status (before file headers)
 
 The user extracted `write_record` and `read_record` into `capture_io.py`. The receiver imports the writer and supplies each complete timestamp-length-payload record; the decoder imports the reader and receives restored bytes, or `None` at normal EOF. File opening remains in the calling scripts. The receiver opens in binary append mode and writes a four-byte little-endian compressed-size prefix followed by one level-6 zlib stream per complete record. The restored record contains eight timestamp bytes, four original-payload-length bytes, and the original UDP payload. The shared writer checks exact decompression equality before writing.
 
@@ -12,11 +26,11 @@ The decoder opens in binary read mode, reads and checks the outer size prefix, r
 
 The user also wrote `check_round_trip` in the shared module. It writes two different complete records through the actual writer, closes and reopens the isolated file, compares both returned records byte-for-byte, and checks that a third read returns `None`. Running `python -B capture_io.py` printed `Success!` during the lesson and again during the documentation/publication review. The originals are 15 and 17 bytes long, using timestamps 1000/2000 and payloads `ABC`/`DEFGH`. These are synthetic storage inputs, not F1 packets. All three Python files pass syntax checking.
 
-No live recording, full compressed game-capture playback, or telemetry fixture checks ran this session. Legacy raw captures and ZIP archives are not detected or supported by the current reader. There is no storage signature/version yet; do not mix experimental compressed records with old captures sharing the same filename. One stream per record is an intermediate step, not the planned multi-record block implementation.
+No live recording, full compressed game-capture playback, or telemetry fixture checks ran this session. Legacy raw captures and ZIP archives are not detected or supported by the current reader. The receiver and decoder do not yet use the new shared storage signature/version; do not mix experimental compressed records with old captures sharing the same filename. One stream per record is an intermediate step, not the planned multi-record block implementation.
 
-The user wrote all implementation and checking code. Earlier assistant comment edits preserved the pre-edit syntax trees; that historical check applies to those comments, not to the later user-written refactor. The publication review updates documentation without changing executable source.
+The user wrote the implementation and round-trip check; the assistant wrote the missing-version check under a specific user exception. Earlier assistant comment edits preserved the pre-edit syntax trees; that historical check applies to those comments, not to the later user-written refactor. The publication review updates documentation without changing executable source.
 
-The next lesson is storage identification/versioning, followed by restoring legacy raw compatibility. See [the handoff](Where%20We%20Left%20Off.md) for the teaching sequence and remaining validation gaps.
+The next lesson is legacy raw reading, followed by explicit format selection and safe append handling; shared header functions are complete. See [the handoff](Where%20We%20Left%20Off.md) for the teaching sequence and remaining validation gaps.
 
 ## Features
 
@@ -66,7 +80,7 @@ Each recording appends to the same file. To start a separate capture, move or re
 python -B capture_io.py
 ```
 
-Expected output: `Success!`. This deliberately replaces only `compression_roundtrip.bin` beside the scripts, which is ignored by Git. It tests two complete records and EOF through the shared functions. It does not start the receiver or decoder, require the game, or verify telemetry layouts. The `__name__` condition runs the check only when this module is launched directly; importing its functions does not run the check.
+Expected output: `Success!` followed by `Missing version correctly rejected!`. This deliberately replaces only `compression_roundtrip.bin` beside the scripts, which is ignored by Git. It tests two complete records and EOF through the shared functions. It does not start the receiver or decoder, require the game, or verify telemetry layouts. The `__name__` condition runs the check only when this module is launched directly; importing its functions does not run the check.
 
 The checking function is permanent project code. Its generated data file is replaceable; there is no separate practice script.
 

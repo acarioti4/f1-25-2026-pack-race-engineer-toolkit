@@ -1,5 +1,9 @@
 # Car Telemetry inventory
 
+## Latest storage update — October 23
+
+Shared marker/version functions and the header-aware two-record check now pass. The assistant added a missing-version rejection check at the user's explicit request; it also passes. These checks concern storage only: all telemetry coverage and verification statuses below remain unchanged. The receiver and decoder do not yet use the new header. Legacy raw compatibility is the next lesson; see the handoff. Earlier storage notes below describe the preceding lesson.
+
 October 23 storage lesson note: telemetry coverage and game/fixture verification statuses below are unchanged. The user moved the experimental compressed writer and reader into `capture_io.py` and added a permanent two-record disk check using those same functions. It passed exact-byte comparisons for both complete records and normal EOF, printing `Success!`. All three Python files pass syntax checking. The synthetic payloads are not F1 packets, so this does not verify telemetry layouts, restored-field validation in the decoder, or game values. Full compressed game-capture playback remains untested and legacy detection is absent. Earlier comment-only syntax-tree checks remain historical. See [the current handoff](Where%20We%20Left%20Off.md).
 
 Reference map prepared on October 20, 2026; implementation coverage updated October 21, 2026. Source: [supplied UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf), pages 2-3 (header and IDs), 11 (telemetry), 19-20 (restrictions), 21 (wheel order), and 30 (surface types). Implementation checked against `f1decoder.py`; capture evidence comes from `Where We Left Off.md`. The updated decoder passed Python syntax checking; no fixture or capture playback tests were run for this update.
