@@ -1,5 +1,17 @@
 # Roadmap
 
+## October 25 — recording header checks complete
+
+This is the current status; older dated sections below are historical. Playback selection and recording header compatibility are complete. The receiver now uses the separate Git-ignored `live_capture.bin` destination in `a+b` mode. It seeks to the end and uses `tell()` to determine size, writes the nine-byte marker/version header only for a new or empty file, or seeks to the beginning and validates an existing header before any write. Both successful branches return to the end before reception. Incompatible files are rejected unchanged.
+
+Temporary terminal diagnostics executed the saved receiver with a temporary destination, simulated socket, and controlled timestamps. Missing and empty files initialized correctly; stopping before packets left a valid header-only file; restarting appended a second record without changing earlier bytes or inserting another header. Both complete records (timestamps 1000/2000, payloads ABC/DEFGH) read back exactly and reached EOF. Raw records, unversioned compressed records, a partial marker, missing version, unsupported version, and wrong marker were rejected unchanged before reception. File and simulated-socket cleanup passed in these cases. All three Python files passed syntax parsing, and `live_capture.bin` passed Git ignore checking.
+
+These are temporary diagnostics, not permanent regression tests, actual UDP reception, telemetry fixtures, or game verification. No existing captures were changed. Header validation does not check existing record integrity. A file-open failure after socket creation still lies outside the current cleanup block; address resource ownership in the next lesson. Milestones 2, 2A, and 2B remain incomplete.
+
+Publication review: explanatory receiver comments were added at the user's request. Syntax-tree comparison against the saved pre-comment source confirmed unchanged executable behavior; all three Python files still parse. Captures and private instructions remain Git-ignored.
+
+**Next lesson:** deliberate script startup. Use the existing direct-run condition in `capture_io.py` as the foundation for callable receiver/playback entry functions so importing them does not start work. Explain file/socket ownership and cleanup. Do not reassign playback selection or recording header checks.
+
 ## October 24 update — raw reading and explicit reader selection
 
 This is the current status and supersedes older next-task and compatibility notes below. Older dated sections are retained as historical evidence.
@@ -91,8 +103,8 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 - [x] Implement raw record reading and explicit raw/compressed record selection.
 - [x] Exercise both selector branches, EOF, unknown labels, and sampled raw truncations in terminal diagnostics.
 - [x] Read the full archived raw capture through the selector and verify returned-byte preservation (358,583 records; no telemetry decoding).
-- [ ] Integrate explicit playback input selection and one-time identified-header validation.
-- [ ] Prevent incompatible appends and use a separate ignored recording destination.
+- [x] Integrate explicit playback input selection and one-time identified-header validation (October 24; temporary in-memory checks passed for all three arrangements and selected invalid inputs; real-file playback remains pending).
+- [x] Prevent header-incompatible appends and use a separate ignored recording destination (October 25; temporary receiver diagnostics passed; existing-record integrity checks remain pending).
 - [ ] Preserve new reader coverage in permanent user-written regression checks.
 - [ ] Separate UDP reception, capture reading, decoding, and presentation.
 - [ ] Use the same decoder for live packets and saved captures.

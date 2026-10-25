@@ -2,7 +2,7 @@
 # zlib restores each compressed record before its original fields are selected.
 import struct
 from pathlib import Path
-from capture_io import read_record
+from capture_io import read_capture_record, read_file_header
 
 # Packet IDs identify layouts, not individual cars. Only IDs 2 and 6 are decoded below.
 packet_names = {
@@ -232,13 +232,24 @@ infringement_type = {
      54: "Attribute assigned"
 }
 
-# Experimental input: four-byte compressed size followed by one zlib record, repeated.
-# Legacy raw captures and ZIP archives are not detected or supported by this reader yet.
+input_format = "unversioned_compressed"
+# Choose raw, unversioned_compressed, or identified_compressed to match the file.
+# This is an explicit choice; ZIP archives are not supported here.
 # capture stays an open file object; its read calls advance the position on disk.
 with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
     record_counter = 0
+    if input_format == "raw":
+        capture_format = "raw"
+    elif input_format == "unversioned_compressed":
+        capture_format = "compressed"
+    elif input_format == "identified_compressed":
+        # Consume the file header once, leaving the first record ready for the loop.
+        read_file_header(capture)
+        capture_format = "compressed"
+    else: raise ValueError("Unknown format.")
+
     while True:
-        restored_record = read_record(capture)
+        restored_record = read_capture_record(capture, capture_format)
         if restored_record is None:
              break # End of file.
         else:

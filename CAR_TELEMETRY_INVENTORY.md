@@ -1,5 +1,9 @@
 # Car Telemetry inventory
 
+## October 25 storage status
+
+Playback selection and recording header compatibility are complete. The receiver uses ignored `live_capture.bin`; temporary diagnostics confirmed initialization, append/readback, and unchanged rejection of incompatible headers. These checks used simulated packets and did not decode telemetry or verify game values. All field statuses below remain unchanged. The next lesson is deliberate script startup; earlier next-task statements below are historical. See the current handoff for details.
+
 ## Latest storage update — October 24
 
 The user completed the raw record reader and explicit raw/compressed reader selection. Both branches passed exact-byte checks for two synthetic records and normal EOF; unknown format and sampled incomplete raw fields were rejected. Existing header/storage checks also passed. A direct read of the old ZIP entry through the raw selector recovered 358,583 records (363,003,398 bytes), with a matching SHA-256 against the original entry. The archive was not extracted or changed.

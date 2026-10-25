@@ -1,5 +1,25 @@
 # Where We Left Off: F1 25 (2026 Pack) Race Engineer Toolkit
 
+## October 25 — recording header checks complete
+
+This is the current status; older dated sections below are historical. Playback selection and recording header compatibility are complete. The receiver now uses the separate Git-ignored `live_capture.bin` destination in `a+b` mode. It seeks to the end and uses `tell()` to determine size, writes the nine-byte marker/version header only for a new or empty file, or seeks to the beginning and validates an existing header before any write. Both successful branches return to the end before reception. Incompatible files are rejected unchanged.
+
+Temporary terminal diagnostics executed the saved receiver with a temporary destination, simulated socket, and controlled timestamps. Missing and empty files initialized correctly; stopping before packets left a valid header-only file; restarting appended a second record without changing earlier bytes or inserting another header. Both complete records (timestamps 1000/2000, payloads ABC/DEFGH) read back exactly and reached EOF. Raw records, unversioned compressed records, a partial marker, missing version, unsupported version, and wrong marker were rejected unchanged before reception. File and simulated-socket cleanup passed in these cases. All three Python files passed syntax parsing, and `live_capture.bin` passed Git ignore checking.
+
+These are temporary diagnostics, not permanent regression tests, actual UDP reception, telemetry fixtures, or game verification. No existing captures were changed. Header validation does not check existing record integrity. A file-open failure after socket creation still lies outside the current cleanup block; address resource ownership in the next lesson. Milestones 2, 2A, and 2B remain incomplete.
+
+Publication review: explanatory receiver comments were added at the user's request. Syntax-tree comparison against the saved pre-comment source confirmed unchanged executable behavior; all three Python files still parse. Captures and private instructions remain Git-ignored.
+
+**Next lesson:** deliberate script startup. Use the existing direct-run condition in `capture_io.py` as the foundation for callable receiver/playback entry functions so importing them does not start work. Explain file/socket ownership and cleanup. Do not reassign playback selection or recording header checks.
+
+## October 24 lesson close — playback integration complete
+
+This supersedes the playback-integration next task below. At the tired user's explicit request to finish the lesson, the assistant corrected the saved playback conditions to compare input_format and set its default to unversioned_compressed, matching the previous expected input arrangement. The existing user-written branches now select raw or compressed record reading, with identified files validating their header once before the loop.
+
+All three Python files passed syntax parsing. Temporary in-memory diagnostics ran the decoder with its input-format setting overridden and file opening replaced with BytesIO: each of the three arrangements processed two synthetic header-only packets and reached EOF. Unknown selection, missing version, unsupported version, and wrong marker were rejected. No permanent tests were added and no capture files were changed. This does not verify telemetry fields or game values. The real f1_capture.bin is absent; ZIP input remains unsupported.
+
+The lesson is finished; no further assignment tonight. Next, when the user is ready: safe append checks and a separate ignored recording destination. Live recording remains deferred. Milestones 2, 2A, and 2B remain incomplete.
+
 ## October 24 update — raw reading and explicit reader selection
 
 This is the current status and supersedes older next-task and compatibility notes below. Older dated sections are retained as historical evidence.
@@ -24,17 +44,14 @@ October 24 publication preparation: explanatory comments were added to the raw r
 
 The receiver and decoder still need this integration. Safe append handling, defensive size/decompression limits, multi-record blocks, kept-history reconciliation, archives, and the catalog remain unfinished. Milestones 2, 2A, and 2B remain incomplete.
 
-## Current game plan — resume after October 24 verification
+## Current game plan — resume after October 25
 
-The completed foundation includes shared compressed I/O, file header functions, the saved two-record and missing-version checks, raw record reading, and explicit raw/compressed record selection. No further edits to the completed selector are currently required.
+1. **Deliberate script startup:** teach callable entry functions and direct-run conditions using the saved code. Explain ownership and cleanup of sockets/files, including failures before the receive loop.
+2. **Shared decoding and presentation:** return named results from packet decoding and separate console formatting, preserving current fields and labels. Feed live and saved payloads through the same decoder.
+3. **Permanent checks:** the user writes regression checks for integrated paths, header rejection without mutation, and error handling. Today's temporary diagnostics do not replace these.
+4. Continue defensive size/decompression checks, blocks, minimum session/track/flashback fields, kept history, and archives/catalog under milestones 2A-2B.
 
-1. **Next connected lesson: playback input selection.** Read the saved playback code first. Teach where a caller supplies the format, how that choice reaches `read_capture_record`, and how the returned record reaches existing slicing/decoding. Account explicitly for three file arrangements: raw, unversioned compressed, and identified compressed. Both compressed arrangements use the same record reader after any required one-time header validation. Demonstrate the complete connection before assigning the user an implementation chunk.
-2. **Safe recording setup.** Teach new/empty-file initialization versus checking a nonempty destination before appending. Reject incompatible contents without changing them. Introduce a distinct ignored recording destination. Keep live recording deferred until this is implemented and checked.
-3. **Deliberate script startup.** Move receiver and playback work behind callable entry functions and direct-run conditions, with file/socket ownership and cleanup explained. Imports must not start recording or playback.
-4. **Shared decoding and presentation.** Extract interpretation of UDP payload bytes into callable decoding that returns named results, then separate console formatting. Feed live and saved packets through the same functions while preserving all current fields and labels.
-5. **Complete milestone 2 checks.** Guide permanent user-written checks for the integrated paths and error handling. The terminal diagnostics from October 24 provide evidence but do not replace saved regression checks. Evaluate milestone completion against actual results.
-
-After milestone 2, continue stronger malformed-input and bounded-decompression checks, multi-record blocks, minimum session/track/flashback fields, kept-history reconciliation, and archives/catalog under 2A-2B. Individual rev-light bits remain queued. The older detailed lesson plan below is reference material; its header/raw-reader assignments are completed and must not be reassigned.
+The learner completed the recording changes. The assistant ran requested diagnostics and later added comments/documentation under explicit authorization. Comment edits preserve executable behavior. The user found the concrete teaching sequence helpful: explain actual values and Python arguments, then give numbered connected edits and review the saved attempt. Use named `os.SEEK_END` and `os.SEEK_SET` options; distinguish calling with parentheses from selecting with brackets.
 
 ## October 23 end-of-session update: file headers
 

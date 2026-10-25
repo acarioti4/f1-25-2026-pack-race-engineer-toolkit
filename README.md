@@ -1,5 +1,23 @@
 # F1 25 (2026 Pack) Race Engineer Toolkit
 
+## October 25 — recording header checks complete
+
+This is the current status; older dated sections below are historical. Playback selection and recording header compatibility are complete. The receiver now uses the separate Git-ignored `live_capture.bin` destination in `a+b` mode. It seeks to the end and uses `tell()` to determine size, writes the nine-byte marker/version header only for a new or empty file, or seeks to the beginning and validates an existing header before any write. Both successful branches return to the end before reception. Incompatible files are rejected unchanged.
+
+Temporary terminal diagnostics executed the saved receiver with a temporary destination, simulated socket, and controlled timestamps. Missing and empty files initialized correctly; stopping before packets left a valid header-only file; restarting appended a second record without changing earlier bytes or inserting another header. Both complete records (timestamps 1000/2000, payloads ABC/DEFGH) read back exactly and reached EOF. Raw records, unversioned compressed records, a partial marker, missing version, unsupported version, and wrong marker were rejected unchanged before reception. File and simulated-socket cleanup passed in these cases. All three Python files passed syntax parsing, and `live_capture.bin` passed Git ignore checking.
+
+These are temporary diagnostics, not permanent regression tests, actual UDP reception, telemetry fixtures, or game verification. No existing captures were changed. Header validation does not check existing record integrity. A file-open failure after socket creation still lies outside the current cleanup block; address resource ownership in the next lesson. Milestones 2, 2A, and 2B remain incomplete.
+
+Publication review: explanatory receiver comments were added at the user's request. Syntax-tree comparison against the saved pre-comment source confirmed unchanged executable behavior; all three Python files still parse. Captures and private instructions remain Git-ignored.
+
+**Next lesson:** deliberate script startup. Use the existing direct-run condition in `capture_io.py` as the foundation for callable receiver/playback entry functions so importing them does not start work. Explain file/socket ownership and cleanup. Do not reassign playback selection or recording header checks.
+
+## Latest October 24 playback update
+
+Playback now supports explicit input_format choices of raw, unversioned_compressed (the default), and identified_compressed. Identified input validates its file header once before record reading. Set the choice to match the input file; this does not detect formats or support ZIP input. The decoder still targets f1_capture.bin, which is currently absent.
+
+All three Python files passed syntax parsing. Temporary in-memory playback diagnostics processed two synthetic header-only packets and EOF for each format, and rejected an unknown choice and missing/unsupported versions or a wrong marker. No capture files were changed. These checks are not permanent tests or telemetry/game verification. Playback integration is complete; safe append checks and a separate recording destination are next. Older status sections below predate this update.
+
 ## October 24 update — raw reading and explicit reader selection
 
 This is the current status and supersedes older next-task and compatibility notes below. Older dated sections are retained as historical evidence.
@@ -58,9 +76,9 @@ The next lesson is playback integration of explicit format selection and one-tim
 
 ## Features
 
-- Read legacy raw records through the shared raw reader and choose raw/compressed record reading explicitly; playback-script integration remains pending.
+- Play back explicitly selected raw, unversioned compressed, or identified compressed input.
 - Save and read complete records through shared length-prefixed zlib functions; the two-record disk check passes, while live use and full game-capture playback remain pending.
-- Display selected values from experimental compressed captures; legacy raw playback worked historically, and the new shared raw reader still needs connecting to the playback script.
+- Record identified compressed captures with header compatibility checks and a separate ignored destination.
 - Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets, plus brake, tyre surface, and tyre core temperatures for all four player wheels.
 - Decode four-wheel tyre pressures and contact-surface names, clutch input, DRS state, and rev-light percentage.
 - Decode current lap time, race position, and lap number from Lap Data packets.
@@ -89,15 +107,13 @@ These defaults assume the game and receiver run on the same PC. The game's desti
 
 ### Record telemetry
 
-The receiver command remains the same, but its output format has changed. The isolated disk check is complete. Live recording remains deferred while storage identification and compatibility are addressed: the receiver still appends to the historical filename without checking its existing format. The command is:
-
 ```bash
 python udpreceiver.py
 ```
 
-The receiver prints its listening address and capture path, then records packets to `f1_capture.bin` beside the scripts. Stop recording with **Ctrl+C**.
+The receiver targets `127.0.0.1:20888` and appends identified version-1 compressed records to `live_capture.bin` beside the scripts. A missing or empty destination receives one header; a nonempty destination must pass marker/version validation before recording. Raw and unversioned compressed files are rejected. Stop with **Ctrl+C**. The destination is Git-ignored; keep renamed recordings ignored or outside the repository too.
 
-Each recording appends to the same file. To start a separate capture, move or rename the existing file before restarting the receiver. Raw captures are excluded from Git.
+Header compatibility and append/readback passed temporary simulated-receiver diagnostics. Actual UDP/game recording with this arrangement has not been verified, and valid headers do not establish record integrity. Script startup and resource ownership are the next lesson; importing the receiver currently starts it.
 
 ### Run the storage check
 
@@ -111,13 +127,21 @@ The checking function is permanent project code. Its generated data file is repl
 
 ### Decode a capture
 
-This is the playback command. The current reader requires an experimental length-prefixed zlib capture; old raw captures and ZIPs are not compatible yet:
-
 ```bash
 python f1decoder.py
 ```
 
-The decoder targets `f1_capture.bin` beside the scripts. Successful legacy playback previously printed packet metadata, supported values, and the total record count. At this review the raw file is absent; `f1_capture.zip` contains an entry named `f1_capture.bin`, but ZIP input is not supported by either script. File paths are resolved relative to the scripts, regardless of the terminal's working directory.
+Before launching, select the intended file path and matching `input_format` in `f1decoder.py`:
+
+| Input arrangement | Setting |
+| --- | --- |
+| Legacy timestamp-length-payload records | `raw` |
+| Earlier compressed records without a file header | `unversioned_compressed` |
+| New recordings with marker/version header | `identified_compressed` |
+
+The saved defaults remain `f1_capture.bin` and `unversioned_compressed`. To replay a new receiver recording, select `live_capture.bin` and `identified_compressed`; the receiver's new destination does not automatically change playback settings. Identified input validates its header once before reading records. Selection is explicit, not automatic format detection.
+
+The old `f1_capture.bin` is absent. Its existing ZIP archive is unchanged; neither script supports ZIP input. Paths are relative to the scripts. Playback selection passed temporary synthetic checks; full new-format game-capture playback remains pending.
 
 ## Decoded fields
 
@@ -162,13 +186,11 @@ There is one repeatable storage self-check, but no broader automated test suite.
 
 ## Next capture and review
 
-The shared writer and reader agree on the experimental format for the two tested records. Live capture is still deferred pending storage identification, compatibility, and a clearly separated recording destination. After that is resolved, a varied session with several laps, braking and acceleration, and changes in wing state will give the next review more to inspect. If convenient, note a few in-game readings and when they occurred for comparison. No additional reverse sample is required.
-
-The October 22 storage priority still governs the sequence. Shared compressed I/O, header functions, raw reading, and explicit record selection are complete, with the October 24 storage evidence recorded above. Playback integration, one-time header handling, and safe append checks come next. Continue pipeline separation, then bring forward the minimum session/track and flashback fields needed for kept history and completed-session archiving; see ROADMAP.md milestones 2A-2B. Individual rev lights remain queued: `m_revLightsBitValue`, uint16 at record +20, with bits 0-14 representing the 15 lights. This is the only remaining undecoded field within the player Car Telemetry record; trailing fields and other car slots remain unimplemented. Keep storage-check evidence, capture observations, exact game comparisons, and telemetry fixture checks distinct.
-
-Preserve the existing archive separately from compression experiments; recording still appends by default. `f1_capture.bin`, `f1_capture.zip`, and `compression_roundtrip.bin` are now explicitly ignored by Git. The raw file remains absent. The ZIP was previously inspected: its directory lists one `f1_capture.bin` entry (363,003,398 uncompressed bytes; 67,144,886 compressed bytes), and its integrity check passed. Capture framing and decoded values remain unchecked. Future storage directories and renamed captures need ignore coverage when introduced.
+Recording header compatibility and a separate destination are complete. Next, separate deliberate script startup and resource cleanup, then shared decoding and presentation. Actual live recording and full new-format game-capture playback remain unverified. Later game comparisons should include several laps and varied telemetry; no additional reverse sample is required.
 
 ## Capture format
+
+New receiver files begin with the eight literal bytes `F1DVZCAP` and the one-byte storage version `01`. That header appears once, followed by length-prefixed compressed records. The storage version is independent of the game protocol version.
 
 Each legacy raw capture record contains the following. This is also the byte arrangement to preserve inside future compressed blocks; the current receiver stores each such record inside its own zlib stream, preceded by a four-byte little-endian compressed size:
 
@@ -184,7 +206,7 @@ The current reader recognizes normal end-of-file at the outer compressed-size pr
 
 ### Planned historical storage
 
-As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared compressed writer and reader pass the two-record disk check. Raw reading and explicit record selection also passed the October 24 checks; application integration and broader verification remain pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
+As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared compressed writer and reader pass the two-record disk check. Raw reading and explicit record selection also passed the October 24 checks; playback integration and recording header compatibility are complete; broader verification remains pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
 
 - **While driving:** save binary records in independently compressed temporary blocks using zlib/DEFLATE (initially level 6). Start by measuring approximately 1 MiB blocks, with record/session boundaries and timed flushing. Memory stays bounded and recording does not need space for an entire uncompressed session.
 - **When rewinding:** keep history before the destination and replace the abandoned continuation. Remove affected blocks and rebuild the boundary block; reconcile laps, events, and statistics too. The permanent history contains detailed telemetry from kept driving, not abandoned attempts or just a final score.

@@ -4,6 +4,7 @@ __pycache__/
 
 # Captured live telemetry is local data, not source
 f1_capture.bin
+live_capture.bin
 
 # Archived telemetry stays local
 f1_capture.zip
