@@ -1,20 +1,6 @@
 # Car Telemetry inventory
 
-## October 25 storage status
-
-Playback selection and recording header compatibility are complete. The receiver uses ignored `live_capture.bin`; temporary diagnostics confirmed initialization, append/readback, and unchanged rejection of incompatible headers. These checks used simulated packets and did not decode telemetry or verify game values. All field statuses below remain unchanged. The next lesson is deliberate script startup; earlier next-task statements below are historical. See the current handoff for details.
-
-## Latest storage update — October 24
-
-The user completed the raw record reader and explicit raw/compressed reader selection. Both branches passed exact-byte checks for two synthetic records and normal EOF; unknown format and sampled incomplete raw fields were rejected. Existing header/storage checks also passed. A direct read of the old ZIP entry through the raw selector recovered 358,583 records (363,003,398 bytes), with a matching SHA-256 against the original entry. The archive was not extracted or changed.
-
-These were storage checks, including temporary terminal diagnostics, not telemetry decoding checks or a new saved regression suite. All field coverage and verification statuses below remain unchanged. This storage result is separate from the earlier 71,243-record decoder playback. ZIP input is not integrated into the application. Next: playback format selection and one-time header handling, followed by safe append checks and a separate recording destination. See the current handoff for the game plan.
-
-## Latest storage update — October 23
-
-Shared marker/version functions and the header-aware two-record check now pass. The assistant added a missing-version rejection check at the user's explicit request; it also passes. These checks concern storage only: all telemetry coverage and verification statuses below remain unchanged. The receiver and decoder do not yet use the new header. Legacy raw compatibility is the next lesson; see the handoff. Earlier storage notes below describe the preceding lesson.
-
-October 23 storage lesson note: telemetry coverage and game/fixture verification statuses below are unchanged. The user moved the experimental compressed writer and reader into `capture_io.py` and added a permanent two-record disk check using those same functions. It passed exact-byte comparisons for both complete records and normal EOF, printing `Success!`. All three Python files pass syntax checking. The synthetic payloads are not F1 packets, so this does not verify telemetry layouts, restored-field validation in the decoder, or game values. Full compressed game-capture playback remains untested and legacy detection is absent. Earlier comment-only syntax-tree checks remain historical. See [the current handoff](Where%20We%20Left%20Off.md).
+Storage integration updated October 25, 2026: explicit playback selection and recording header compatibility are implemented. Temporary storage diagnostics passed; no new telemetry-field or game verification was performed. Field statuses below remain unchanged.
 
 Reference map prepared on October 20, 2026; implementation coverage updated October 21, 2026. Source: [supplied UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf), pages 2-3 (header and IDs), 11 (telemetry), 19-20 (restrictions), 21 (wheel order), and 30 (surface types). Implementation checked against `f1decoder.py`; capture evidence comes from `Where We Left Off.md`. The updated decoder passed Python syntax checking; no fixture or capture playback tests were run for this update.
 
@@ -57,7 +43,7 @@ The final field occupies offsets 55-58, so the next record begins 59 bytes after
 
 All wheel arrays use: **0 rear left, 1 rear right, 2 front left, 3 front right**. Each element starts at the array's offset plus its index multiplied by the size of one element.
 
-Application terminology: **tyre core temperature** maps to the specification's `m_tyresInnerTemperature`. Core and surface are the user's chosen racing terms for display and teaching. The protocol field name remains unchanged in this inventory.
+Application terminology: **tyre core temperature** maps to the specification's `m_tyresInnerTemperature`. The application displays core and surface temperatures separately. The protocol field name remains unchanged in this inventory.
 
 The player decoder reads brake temperatures with `struct.unpack_from("<4H", ...)` and tyre surface/core temperatures with `struct.unpack_from("<4B", ...)`. It checks the field offset plus eight or four bytes respectively, retains each four-value tuple, and indexes it directly in the labelled Celsius output.
 
@@ -92,7 +78,7 @@ Reviewed means the layout and meaning were checked against the supplied PDF. It 
 | m_steer | Player only | Yes | No | Capture approximately -1.00 to +0.73; full travel and exact comparison incomplete |
 | m_brake | Player only, displayed as percent | Yes | No | Capture 0-100%; exact game comparison incomplete |
 | m_clutch | Player only, percent; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_gear | Player only, signed | Yes | No | Neutral and 1-8 observed; reverse assumed working at user request, not observed; exact comparison incomplete |
+| m_gear | Player only, signed | Yes | No | Neutral and 1-8 observed; reverse uses signed decoding but was not observed; exact comparison incomplete |
 | m_engineRPM | Player only | Yes | No | Capture 3920-13204 RPM; exact game comparison incomplete |
 | m_drs | Player only, Closed/Open display; syntax check passed | Yes | No | Playback and game comparison pending |
 | m_revLightsPercent | Player only, percent; syntax check passed | Yes | No | Playback and game comparison pending |
