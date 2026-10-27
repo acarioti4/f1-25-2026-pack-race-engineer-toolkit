@@ -8,7 +8,7 @@ Capture playback supports explicit raw, unversioned compressed, and identified c
 
 Temporary diagnostics confirmed exact record readback, preservation of existing bytes during append, and unchanged rejection of incompatible headers. These checks used simulated reception, not live UDP or game verification. Existing-record integrity checks, bounded decompression, and permanent regression coverage remain incomplete.
 
-Next development priorities are callable script entry points, complete resource cleanup, and shared decoding separated from presentation. See [ROADMAP.md](ROADMAP.md) and [project status](Where%20We%20Left%20Off.md).
+Next development priorities are callable script entry points, complete resource cleanup, and shared decoding separated from presentation. The planned pipeline must also keep reception quick, bound application memory, and meet measured performance budgets while the game runs. These are requirements, not verified prototype behavior. See [ROADMAP.md](ROADMAP.md) and [project status](Where%20We%20Left%20Off.md).
 
 ## Features
 
@@ -120,6 +120,8 @@ Engine temperature, four-wheel brake/surface/core temperatures, tyre pressures, 
 
 There is one repeatable storage self-check, but no broader automated test suite. Telemetry fixtures, malformed-input tests, other car indices, and restricted-data handling still need coverage. The two-record check does not exercise the decoder's restored-field validation. Malformed captures, unsupported formats, and unsupported versions of the implemented packet types currently stop the offline decoder with an error. Size limits, bounded decompression, and rejecting extra compressed streams/bytes are also unfinished.
 
+The receiver currently calls the compressed writer directly after each receive. Compression, verification decompression, disk writes, and a file-buffer flush all run before the next receive; there is no storage worker or byte-bounded handoff yet. The offline decoder prints for every packet. No target-PC CPU/RAM budgets, game frame-time measurements, or desktop refresh controls have been established.
+
 ## Next capture and review
 
 Recording header compatibility and a separate destination are complete. Next, separate deliberate script startup and resource cleanup, then shared decoding and presentation. Actual live recording and full new-format game-capture playback remain unverified. Later game comparisons should include several laps and varied telemetry; no additional reverse sample is required.
@@ -140,14 +142,25 @@ The current reader recognizes normal end-of-file at the outer compressed-size pr
 
 ## Roadmap
 
+### Planned performance requirements
+
+The following requirements apply across reception, storage, state, and the future desktop interface. Implementation and performance verification remain pending; the corresponding work and acceptance checks are in [ROADMAP.md](ROADMAP.md).
+
+- **Keep reception quick:** limit the receive path to receiving, timestamping, and a bounded handoff. Move compression, disk writes, and expensive history work to scheduled workers. Bound waiting data by bytes, including work in progress. UDP cannot slow the game's sender: if storage fails or its byte budget fills, stop recording with an explicit incomplete status, reason, and loss counters; preserve queued data where possible and keep receiving for live state. Do not wait for storage or grow an unlimited backlog.
+- **Refresh independently:** preserve incoming telemetry at its received rate within storage capacity, while refreshing dashboard values at an initial 20–30 Hz target to validate by measurement. Coalesce intermediate display updates into the latest snapshot so pending UI work stays bounded; reduce refreshes when minimized. Display coalescing must not discard capture records or required history/events.
+- **Bound all memory:** cap chart history, event lists, caches, pending work, and loaded comparisons as well as compression blocks. Define retention/eviction behavior and enforce capture/record size and decompressed-output limits before allocating from file-supplied sizes or expanding compressed data.
+- **Control maintenance:** defer ZIP creation, archive rebuilding, catalog recovery, and detailed comparisons until active driving ends, or explicitly pause/budget them when driving resumes. Give rewind processing a bounded work budget. Streaming limits memory, but compression and disk access still consume resources.
+- **Keep background activity modest:** rate-limit logs, avoid continuous polling, and use a small worker count chosen through measurement. A worker thread can keep the interface responsive while still competing with the game for CPU and disk time.
+- **Make performance a release requirement:** establish numeric CPU and RAM budgets on the target Windows PC and verify them with the game running. Measure frame-time spikes and tail latency alongside CPU bursts, memory peaks, disk activity, and GPU use; low average CPU alone is insufficient. Record the hardware, workload, budgets, and results before release.
+
 ### Planned historical storage
 
 As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared compressed writer and reader pass the two-record disk check. Raw reading and explicit record selection also passed the October 24 checks; playback integration and recording header compatibility are complete; broader verification remains pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
 
-- **While driving:** save binary records in independently compressed temporary blocks using zlib/DEFLATE (initially level 6). Start by measuring approximately 1 MiB blocks, with record/session boundaries and timed flushing. Memory stays bounded and recording does not need space for an entire uncompressed session.
-- **When rewinding:** keep history before the destination and replace the abandoned continuation. Remove affected blocks and rebuild the boundary block; reconcile laps, events, and statistics too. The permanent history contains detailed telemetry from kept driving, not abandoned attempts or just a final score.
-- **After completion:** stream accepted temporary blocks through decompression into session entries in the corresponding track/layout ZIP. ZIP DEFLATE compresses those records as they are written; do not create nested session ZIPs or a full raw intermediate file. Include session metadata and summaries. Verify the archive and catalog update before removing temporary storage.
-- **For browsing:** keep a small, rebuildable catalog outside the ZIPs. List track/session summaries quickly and load detailed telemetry only for selected comparisons. Preserve date, layout, session type, car and available conditions so comparisons have context. CSV can be an export option.
+- **While driving:** save binary records in independently compressed temporary blocks using zlib/DEFLATE (initially level 6) outside the receive path. Start by measuring approximately 1 MiB blocks, with record/session boundaries and timed flushing. Bound blocks and the full storage handoff by bytes, using the overload policy above; recording does not need space for an entire uncompressed session.
+- **When rewinding:** keep history before the destination and replace the abandoned continuation. Remove affected blocks and rebuild the boundary block; reconcile laps, events, and statistics too, within the rewind work budget. The permanent history contains detailed telemetry from kept driving, not abandoned attempts or just a final score.
+- **After completion:** schedule finalization away from active driving, streaming accepted temporary blocks through decompression into session entries in the corresponding track/layout ZIP. ZIP DEFLATE compresses those records as they are written; do not create nested session ZIPs or a full raw intermediate file. Include session metadata and summaries. Verify the archive and catalog update before removing temporary storage.
+- **For browsing:** keep a small, rebuildable catalog outside the ZIPs. List track/session summaries quickly and load detailed telemetry only for selected comparisons within explicit memory limits. Schedule catalog recovery and detailed comparisons under the maintenance budget. Preserve date, layout, session type, car and available conditions so comparisons have context. CSV can be an export option.
 
 Track identity and FLBK handling will be brought forward from Session/header/Event decoding when needed. Unknown tracks stay unclassified; interrupted sessions stay explicitly incomplete and recoverable. Legacy raw-capture compatibility must remain preserved through the planned shared decoder. Compression/block sizing, recovery, rewind boundaries, and archive updates need tests before this becomes a supported feature. See milestones **2A and 2B** in [ROADMAP.md](ROADMAP.md) for the compression lifecycle, sequencing, and acceptance checks.
 
