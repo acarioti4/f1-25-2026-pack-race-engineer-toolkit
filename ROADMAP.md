@@ -2,13 +2,13 @@
 
 Build a Windows desktop application using Python and PySide6 that exposes all available fields and car slots in **F1 25: 2026 Season Pack UDP specification v1.2**, covering packet types 0–16. Milestones describe development order without fixed release dates.
 
-## Current status — October 27, 2026
+## Current status — November 4, 2026
 
-Shared compressed capture I/O, storage headers, raw record reading, explicit playback selection, and recording header compatibility are implemented. Recording uses the separate ignored `live_capture.bin` destination. Temporary diagnostics passed initialization, exact append/readback, EOF, and rejection of incompatible headers without modifying their bytes. These results do not establish live UDP operation, telemetry correctness, or existing-record integrity.
+Shared compressed capture I/O, storage headers, raw record reading, and explicit playback selection are implemented. Receiver revision `483c35e` adds guarded startup and context-managed cleanup, but now writes raw `f1_capture.bin` in the working directory and does not use compressed storage or validate append compatibility. Historical diagnostics for the previous receiver passed initialization, exact append/readback, EOF, and rejection of incompatible headers without modifying their bytes; they do not cover the current receiver. These earlier storage results do not establish live UDP operation, telemetry correctness, or existing-record integrity. The historical capture/archive inputs described below are not included in this checkout.
 
-Next: callable receiver/playback entry points with complete resource cleanup, followed by shared decoding and separate presentation. Milestones 2, 2A, and 2B remain incomplete. Block storage, rewind reconciliation, archives, and the catalog are not implemented.
+Next: guard playback startup, make receiver parameters effective, and separate shared decoding and presentation. Milestones 2, 2A, and 2B remain incomplete. Block storage, rewind reconciliation, archives, and the catalog are not implemented.
 
-Player decoding covers 15 of 16 Car Telemetry record fields plus current lap time, position, and lap number. The October 20 playback covered the original six telemetry fields and three lap fields; later additions still need playback, fixture, and exact game comparisons. See [project status](Where%20We%20Left%20Off.md) for evidence and limitations.
+Player decoding covers 15 of 16 Car Telemetry record fields plus current lap time, position, and lap number. Historical October 20 playback reports cover the original six telemetry fields and three lap fields. November 4 temporary synthetic playback checks passed all implemented fields across the three input arrangements at player slots 0 and 23. Later additions still need real-capture playback, permanent fixtures, and exact game comparisons. See [project status](Where%20We%20Left%20Off.md) for evidence and limitations.
 
 Performance requirements added October 27 are planned work throughout the milestones below. Reception, display refresh, memory limits, maintenance scheduling, and target-PC release budgets have not yet been implemented or verified.
 
@@ -23,14 +23,18 @@ Performance requirements added October 27 are planned work throughout the milest
 
 ## 2. Separate the data pipeline
 
-- [x] Extract record compression and disk reading/writing into shared functions used by the scripts and storage check.
+- [x] Add guarded receiver `main()` so imports do not start networking.
+- [ ] Add a guarded callable playback entry point; importing the decoder still starts playback.
+- [ ] Make receiver `main()` parameters effective; binding uses globals and the output filename is hardcoded.
+- [x] Use receiver socket/file context managers for startup failures and loop exits (code reviewed; runtime failure-path diagnostics pending).
+- [x] Extract record compression and disk reading/writing into shared functions used by playback and storage checks; current receiver integration remains pending.
 - [x] Implement shared file marker/version functions and pass the existing header-aware storage checks.
 - [x] Implement raw record reading and explicit raw/compressed record selection.
 - [x] Exercise both selector branches, EOF, unknown labels, and sampled raw truncations in terminal diagnostics.
 - [x] Read the full archived raw capture through the selector and verify returned-byte preservation (358,583 records; no telemetry decoding).
 - [x] Integrate explicit playback input selection and one-time identified-header validation (October 24; temporary in-memory checks passed for all three arrangements and selected invalid inputs; real-file playback remains pending).
-- [x] Prevent header-incompatible appends and use a separate ignored recording destination (October 25; temporary receiver diagnostics passed; existing-record integrity checks remain pending).
-- [ ] Preserve new reader coverage in permanent regression checks.
+- [ ] Restore header-compatible compressed recording and a separate destination. October 25 diagnostics covered the previous receiver; revision `483c35e` now appends raw records without validation.
+- [ ] Preserve new reader coverage in permanent regression checks. November 4 temporary synthetic playback checks passed all three formats at player slots 0/23; they are not committed tests.
 - [ ] Separate UDP reception, capture reading, decoding, and presentation.
 - [ ] Keep the reception path limited to receiving, timestamping, basic validation, and bounded handoff. Move compression, compression verification, disk writes/flushes, and expensive history processing to downstream workers.
 - [ ] Bound pending work by bytes, including in-flight buffers, and never wait for storage capacity in the receive loop. UDP cannot make the game slow its transmission; implement the explicit overload policy in milestone 2A.
@@ -46,7 +50,7 @@ Performance requirements added October 27 are planned work throughout the milest
 
 **Planning decision: October 22, 2026. Foundation started; block storage and kept history are not implemented.** Build this foundation alongside the pipeline separation, before broad packet expansion and desktop work. Historical storage must support comparing kept laps and sessions by track. "Kept results" includes detailed telemetry from the accepted driving timeline, not just finishing position or summary statistics. Abandoned rewind attempts are excluded from permanent session history.
 
-Current intermediate format compresses one complete record at level 6, prefixes its compressed size with four little-endian bytes, and flushes the file after each write. The two-record check passes, but this is not the planned multi-record, timed-flush design below. Original timestamp-length-payload bytes remain unchanged inside compression. Legacy raw reading and explicit playback selection are implemented; cross-format decoded-value comparisons remain pending.
+The shared compressed writer compresses one complete record at level 6, prefixes its compressed size with four little-endian bytes, and flushes the file after each write. Both built-in storage checks (two-record round trip/EOF and missing-version rejection) pass, but this is not the planned multi-record, timed-flush design below. The receiver currently writes raw records directly; it does not call this writer. Original timestamp-length-payload bytes remain unchanged inside compression. Legacy raw reading and explicit playback selection are implemented; synthetic decoded-value checks passed across formats on November 4, while real-capture comparisons remain pending.
 
 Implementation sequence:
 
@@ -167,4 +171,4 @@ Validation should grow alongside each milestone; this final milestone completes 
 
 ## Scope
 
-Windows and the 2026 packet format are the initial targets. The roadmap can grow as the project develops; cloud services, support for other protocol years, and race-strategy predictions are possible future directions. Raw captures stay excluded from Git.
+Windows and the 2026 packet format are the initial targets. The roadmap can grow as the project develops; cloud services, support for other protocol years, and race-strategy predictions are possible future directions. The named capture files, local archive, and storage-check output stay excluded from Git; renamed recordings need their own ignore rule or storage outside the repository.

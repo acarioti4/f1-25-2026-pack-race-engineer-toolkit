@@ -1,20 +1,22 @@
 # F1 25 (2026 Pack) Race Engineer Toolkit
 
-A Python telemetry toolkit for **F1 25: 2026 Season Pack UDP specification v1.2**, targeting a Windows desktop application with PySide6. The current prototype records compressed UDP captures and decodes selected player telemetry and lap data. The desktop interface is not yet implemented.
+A Python telemetry toolkit for **F1 25: 2026 Season Pack UDP specification v1.2**, targeting a Windows desktop application with PySide6. The current prototype records raw UDP captures and decodes selected player telemetry and lap data. The desktop interface is not yet implemented.
 
 ## Current status
 
-Capture playback supports explicit raw, unversioned compressed, and identified compressed inputs. Recording uses a separate Git-ignored `live_capture.bin` destination, initializes new or empty files with a versioned header, and validates an existing header before appending.
+Reviewed against this checkout on November 4, 2026.
 
-Temporary diagnostics confirmed exact record readback, preservation of existing bytes during append, and unchanged rejection of incompatible headers. These checks used simulated reception, not live UDP or game verification. Existing-record integrity checks, bounded decompression, and permanent regression coverage remain incomplete.
+Capture playback supports explicit raw, unversioned compressed, and identified compressed inputs. The current receiver appends raw records to Git-ignored `f1_capture.bin` in the working directory. It does not use the shared compressed writer or validate existing file contents before appending.
 
-Next development priorities are callable script entry points, complete resource cleanup, and shared decoding separated from presentation. The planned pipeline must also keep reception quick, bound application memory, and meet measured performance budgets while the game runs. These are requirements, not verified prototype behavior. See [ROADMAP.md](ROADMAP.md) and [project status](Where%20We%20Left%20Off.md).
+The two built-in storage checks pass. Temporary synthetic playback checks also pass for all three input arrangements, player slots 0 and 23, all implemented telemetry/lap fields, reverse gear, and unknown surface/packet IDs. Earlier simulated-receiver diagnostics reported compatible append behavior. Live game verification, existing-record integrity checks, bounded decompression, and broader permanent regression coverage remain incomplete.
+
+The receiver now has a guarded `main()` and context-managed socket/file cleanup. Next priorities are a guarded playback entry point, effective receiver configuration, and shared decoding separated from presentation. The planned pipeline must also keep reception quick, bound application memory, and meet measured performance budgets while the game runs. These are requirements, not verified prototype behavior. See [ROADMAP.md](ROADMAP.md) and [project status](Where%20We%20Left%20Off.md).
 
 ## Features
 
 - Play back explicitly selected raw, unversioned compressed, or identified compressed input.
 - Save and read complete records through shared length-prefixed zlib functions; the two-record disk check passes, while live use and full game-capture playback remain pending.
-- Record identified compressed captures with header compatibility checks and a separate ignored destination.
+- Record raw timestamp-length-payload captures; compressed storage helpers remain available separately.
 - Decode speed, gear, throttle, brake, RPM, steering, and engine temperature from Car Telemetry packets, plus brake, tyre surface, and tyre core temperatures for all four player wheels.
 - Decode four-wheel tyre pressures and contact-surface names, clutch input, DRS state, and rev-light percentage.
 - Decode current lap time, race position, and lap number from Lap Data packets.
@@ -25,10 +27,12 @@ Next development priorities are callable script entry points, complete resource 
 
 ### Requirements
 
-- Python 3
+- Python 3.8 or later for the APIs currently used (`bytes.hex(" ")` requires 3.8); this review used Python 3.12.14 on Linux. Windows runtime verification remains pending.
 - F1 25 with the 2026 Season Pack for recording live telemetry
 
 The current scripts use only the Python standard library. PySide6 is planned for the desktop interface and is not required to run the prototype.
+
+Run commands from the repository directory; on Windows, `py` can replace `python` if that is your Python launcher. No dependency installation or build step is needed. Captures and archives are not included in this checkout.
 
 ### Configure the game
 
@@ -47,9 +51,9 @@ These defaults assume the game and receiver run on the same PC. The game's desti
 python udpreceiver.py
 ```
 
-The receiver targets `127.0.0.1:20888` and appends identified version-1 compressed records to `live_capture.bin` beside the scripts. A missing or empty destination receives one header; a nonempty destination must pass marker/version validation before recording. Raw and unversioned compressed files are rejected. Stop with **Ctrl+C**. The destination is Git-ignored; keep renamed recordings ignored or outside the repository too.
+The receiver binds `127.0.0.1:20888` and appends raw records to `f1_capture.bin` in the current working directory. Stop with **Ctrl+C**. There is no file header or compatibility check: use a new file or an existing raw capture, and move incompatible compressed data aside before recording. The filename is Git-ignored; keep renamed recordings ignored or outside the repository too.
 
-Header compatibility and append/readback passed temporary simulated-receiver diagnostics. Actual UDP/game recording with this arrangement has not been verified, and valid headers do not establish record integrity. Callable entry points and complete resource cleanup remain pending; importing the receiver currently starts it.
+Importing the receiver no longer starts recording; direct execution calls `main()`. Socket and file context managers cover startup failures and loop exits. The `capture_path`, `udp_ip`, and `udp_port` parameters currently have no effect: binding uses `UDP_IP`/`UDP_PORT`, and file opening hardcodes `"f1_capture.bin"`. Edit the effective values in the code to change them. Earlier header/append diagnostics describe the previous compressed receiver, not the current implementation. Actual UDP/game recording with this revision remains unverified.
 
 ### Run the storage check
 
@@ -59,7 +63,7 @@ python -B capture_io.py
 
 Expected output: `Success!` followed by `Missing version correctly rejected!`. This deliberately replaces only `compression_roundtrip.bin` beside the scripts, which is ignored by Git. It tests two complete records and EOF through the shared functions. It does not start the receiver or decoder, require the game, or verify telemetry layouts. The `__name__` condition runs the check only when this module is launched directly; importing its functions does not run the check.
 
-The checking function is permanent project code. Its generated data file is replaceable; there is no separate practice script.
+These two checking functions are permanent project code. The second check overwrites the round-trip data, so the generated file ends with only `F1DVZCAP` and is intentionally invalid as a capture. There is no separate practice script.
 
 ### Decode a capture
 
@@ -67,17 +71,45 @@ The checking function is permanent project code. Its generated data file is repl
 python f1decoder.py
 ```
 
-Before launching, select the intended file path and matching `input_format` in `f1decoder.py`:
+Before launching, edit both settings in `f1decoder.py`; there are no command-line options. For a new receiver recording, use:
+
+```python
+input_format = "raw"
+# In the existing with open(...) statement:
+with open(Path(__file__).resolve().parent / "f1_capture.bin", "rb") as capture:
+    ...  # Keep the existing decoding body here.
+```
+
+Keep the existing indented body of that `with` statement. Choose the format that matches the file:
 
 | Input arrangement | Setting |
 | --- | --- |
 | Legacy timestamp-length-payload records | `raw` |
 | Earlier compressed records without a file header | `unversioned_compressed` |
-| New recordings with marker/version header | `identified_compressed` |
+| Identified captures with marker/version header | `identified_compressed` |
 
-The saved defaults remain `f1_capture.bin` and `unversioned_compressed`. To replay a new receiver recording, select `live_capture.bin` and `identified_compressed`; the receiver's new destination does not automatically change playback settings. Identified input validates its header once before reading records. Selection is explicit, not automatic format detection.
+The saved defaults remain `f1_capture.bin` and `unversioned_compressed`. To replay a current receiver recording, select `raw` and the recorded file. Run the receiver from the repository directory to match the decoder's script-relative `f1_capture.bin` path, or edit the decoder path explicitly. Identified input validates its header once before reading records. Selection is explicit, not automatic format detection.
 
-The old `f1_capture.bin` is absent. Its existing ZIP archive is unchanged; neither script supports ZIP input. Paths are relative to the scripts. Playback selection passed temporary synthetic checks; full new-format game-capture playback remains pending.
+Neither `f1_capture.bin` nor `f1_capture.zip` is tracked or present in this checkout. Earlier notes describe a local archive used in prior diagnostics; it is not a bundled sample. Extract a capture from your own ZIP before playback; neither script accepts ZIP input. The decoder resolves its default capture path beside the script; the receiver writes relative to the working directory. Importing `f1decoder.py` also starts playback. Full new-format game-capture playback remains pending.
+
+## Repository files
+
+| File | Purpose |
+| --- | --- |
+| `udpreceiver.py` | Receives and records raw UDP via guarded `main()`; safe to import |
+| `f1decoder.py` | Reads a manually selected capture and prints decoded values; starts on import or direct execution |
+| `capture_io.py` | Shared storage functions; direct execution runs two storage checks |
+| [UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf) | Protocol reference |
+| [Car Telemetry inventory](CAR_TELEMETRY_INVENTORY.md) | Field layouts and implementation/verification coverage |
+| [Project status](Where%20We%20Left%20Off.md) | Evidence, limitations, and next steps |
+| [Roadmap](ROADMAP.md) | Planned features and acceptance criteria |
+
+## Troubleshooting
+
+- **Missing capture:** provide a capture and edit the decoder path and format before running. A fresh checkout has no sample data.
+- **Invalid header/format:** match the input format to the actual file. The current receiver appends raw bytes without checking the destination; preserve incompatible data before starting it.
+- **Address already in use:** stop another receiver using port `20888`, or edit the receiver port and game destination together.
+- **No packets:** check that game UDP output is enabled and matches the receiver address/port. The receiver waits for data and cannot decode live values.
 
 ## Decoded fields
 
@@ -114,23 +146,25 @@ The application deliberately displays `m_drs` as **Closed/Open** (0/1), with **U
 
 Before engine temperature was added, an October 20, 2026 capture playback processed **71,243 records** without error, including **9,695 Car Telemetry** and **9,695 Lap Data** packets. Observed values included speeds of 0–318 km/h, neutral and forward gears 1–8, a stop in neutral, and simultaneous throttle and brake input.
 
-These results demonstrate successful playback with plausible values; exact comparisons with the game's display remain incomplete. Reverse uses signed gear decoding and is assumed working, but was not observed in that capture. Lap progression and full steering travel also remain unverified.
+These results demonstrate successful playback with plausible values; exact comparisons with the game's display remain incomplete. Reverse uses signed gear decoding and passes the temporary synthetic check, but was not observed in that capture. Lap progression and full steering travel also remain unverified.
 
-Engine temperature, four-wheel brake/surface/core temperatures, tyre pressures, contact surfaces, clutch, DRS, and rev-light percentage are implemented, specification-reviewed, and syntax-checked. Playback, fixture testing, and exact game comparisons for these additions remain pending. The earlier capture results do not cover these additions. Comment-only edits were checked by syntax-tree comparison and preserved executable behavior.
+On November 4, 2026, both built-in storage checks and syntax parsing of all three modules passed under Python 3.12.14. Temporary in-memory playback diagnostics exercised raw, unversioned compressed, and identified compressed input with player slots 0 and 23. All 15 implemented telemetry fields and three lap fields matched synthetic values, including wheel ordering, unit conversions, reverse gear, an unknown surface ID, and an unknown packet ID. The harness changed only the input-format assignment in an in-memory syntax tree and substituted an in-memory capture; repository source and user captures were not changed.
 
-There is one repeatable storage self-check, but no broader automated test suite. Telemetry fixtures, malformed-input tests, other car indices, and restricted-data handling still need coverage. The two-record check does not exercise the decoder's restored-field validation. Malformed captures, unsupported formats, and unsupported versions of the implemented packet types currently stop the offline decoder with an error. Size limits, bounded decompression, and rejecting extra compressed streams/bytes are also unfinished.
+These six synthetic cases are not a committed regression suite or real game-capture evidence. Historical capture results above do not cover the later temperature, pressure, surface, clutch, DRS, or rev-light additions. Real-capture playback and exact game comparisons for these additions remain pending.
 
-The receiver currently calls the compressed writer directly after each receive. Compression, verification decompression, disk writes, and a file-buffer flush all run before the next receive; there is no storage worker or byte-bounded handoff yet. The offline decoder prints for every packet. No target-PC CPU/RAM budgets, game frame-time measurements, or desktop refresh controls have been established.
+There are two repeatable storage self-checks, but no broader automated test suite. Permanent telemetry fixtures, malformed-input tests, intermediate car indices, split-screen behavior, and restricted-data handling still need coverage. The built-in storage checks do not exercise the decoder's restored-field validation. Malformed captures, unsupported formats, and unsupported versions of the implemented packet types currently stop the offline decoder with an error. Size limits, bounded decompression, and rejecting extra compressed streams/bytes are also unfinished.
+
+The receiver currently prints packet metadata and a full hex dump, writes raw fields, and flushes the file before the next receive; there is no storage worker or byte-bounded handoff yet. The offline decoder prints for every packet. No target-PC CPU/RAM budgets, game frame-time measurements, or desktop refresh controls have been established.
 
 ## Next capture and review
 
-Recording header compatibility and a separate destination are complete. Next, separate deliberate script startup and resource cleanup, then shared decoding and presentation. Actual live recording and full new-format game-capture playback remain unverified. Later game comparisons should include several laps and varied telemetry; no additional reverse sample is required.
+Receiver startup and context-managed cleanup are implemented. Compressed recording integration and header-safe append behavior from the previous receiver are no longer present. Next, guard playback startup, make receiver parameters effective, and separate shared decoding and presentation. Actual live recording and full new-format game-capture playback remain unverified. Later game comparisons should include several laps and varied telemetry; no additional reverse sample is required.
 
 ## Capture format
 
-New receiver files begin with the eight literal bytes `F1DVZCAP` and the one-byte storage version `01`. That header appears once, followed by length-prefixed compressed records. The storage version is independent of the game protocol version.
+Current receiver files contain raw records without a header. Identified compressed captures produced by the shared helpers or previous receiver begin with the eight literal bytes `F1DVZCAP` and the one-byte storage version `01`, followed by length-prefixed compressed records. The storage version is independent of the game protocol version.
 
-Each legacy raw capture record contains the following. This is also the byte arrangement to preserve inside future compressed blocks; the current receiver stores each such record inside its own zlib stream, preceded by a four-byte little-endian compressed size:
+Each current or legacy raw capture record contains the following. The shared compressed writer stores this same arrangement inside a zlib stream, preceded by a four-byte little-endian compressed size:
 
 | Field | Size | Encoding |
 | --- | --- | --- |
@@ -138,7 +172,7 @@ Each legacy raw capture record contains the following. This is also the byte arr
 | Payload length | 4 bytes | Unsigned little-endian byte count |
 | Payload | Variable | Original game UDP bytes |
 
-The current reader recognizes normal end-of-file at the outer compressed-size prefix and checks incomplete fields and mismatched payload sizes. Captures can contain multiple recording periods because recording appends to the existing file.
+The compressed reader checks the outer size prefix and compressed-byte count, then decompresses the stream; the decoder separately checks the restored timestamp, payload length, and selected game fields. The raw reader checks its timestamp, length, and payload reads. Normal EOF is an empty read at the next record boundary. Neither reader enforces size limits, and the compressed reader does not reject trailing compressed streams/bytes. The decoder checks enough bytes for selected fields rather than requiring a full documented packet layout. Captures can contain multiple recording periods because recording appends to the existing file.
 
 ## Roadmap
 
@@ -155,7 +189,7 @@ The following requirements apply across reception, storage, state, and the futur
 
 ### Planned historical storage
 
-As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared compressed writer and reader pass the two-record disk check. Raw reading and explicit record selection also passed the October 24 checks; playback integration and recording header compatibility are complete; broader verification remains pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
+As agreed October 22, 2026, build historical storage early, alongside data-pipeline separation and before broad decoding/UI expansion. The shared compressed writer and reader pass the two-record disk check. Raw reading and explicit record selection also passed the October 24 checks; playback integration is complete, while recording header compatibility belongs to the previous receiver and must be restored for compressed recording; broader verification remains pending. The planned block storage, rewind reconciliation, archives, and catalog remain unimplemented.
 
 - **While driving:** save binary records in independently compressed temporary blocks using zlib/DEFLATE (initially level 6) outside the receive path. Start by measuring approximately 1 MiB blocks, with record/session boundaries and timed flushing. Bound blocks and the full storage handoff by bytes, using the overload policy above; recording does not need space for an entire uncompressed session.
 - **When rewinding:** keep history before the destination and replace the abandoned continuation. Remove affected blocks and rebuild the boundary block; reconcile laps, events, and statistics too, within the rewind work budget. The permanent history contains detailed telemetry from kept driving, not abandoned attempts or just a final score.

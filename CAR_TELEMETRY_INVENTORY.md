@@ -1,8 +1,8 @@
 # Car Telemetry inventory
 
-Storage integration updated October 25, 2026: explicit playback selection and recording header compatibility are implemented. Temporary storage diagnostics passed; no new telemetry-field or game verification was performed. Field statuses below remain unchanged.
+Reviewed November 4, 2026 against `f1decoder.py` and the supplied v1.2 PDF. Temporary synthetic playback assertions passed all 15 implemented telemetry fields in all three capture formats at player indices 0 and 23. Both built-in storage checks and syntax parsing passed under Python 3.12.14 on Linux. No real game verification was performed; executable code is unchanged.
 
-Reference map prepared on October 20, 2026; implementation coverage updated October 21, 2026. Source: [supplied UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf), pages 2-3 (header and IDs), 11 (telemetry), 19-20 (restrictions), 21 (wheel order), and 30 (surface types). Implementation checked against `f1decoder.py`; capture evidence comes from `Where We Left Off.md`. The updated decoder passed Python syntax checking; no fixture or capture playback tests were run for this update.
+Reference map prepared on October 20, 2026; implementation coverage updated October 21, 2026. Source: [supplied UDP specification v1.2](Data%20Output%20from%20F1%2025%202026%20Season%20Pack.pdf), pages 2-3 (header and IDs), 11 (telemetry), 19-20 (restrictions), 21 (wheel order), and 30 (surface types). Implementation checked against `f1decoder.py`; capture evidence comes from `Where We Left Off.md`. Historical capture observations below come from prior project notes; those captures are absent from this checkout. November 4 checks used temporary synthetic data, not a committed fixture suite.
 
 ## Packet overview
 
@@ -71,29 +71,29 @@ For single-player race mode, MFD panel IDs are: 0 Car setup, 1 Pits, 2 Damage, 3
 
 Reviewed means the layout and meaning were checked against the supplied PDF. It does not mean the decoder has passed tests. Player only means the current decoder selects the header's player-car slot rather than decoding every car.
 
-| Field | Implemented | Specification reviewed | Fixture tested | Game verification |
+| Field | Implemented | Specification reviewed | Synthetic validation (temporary) | Game verification |
 | --- | --- | --- | --- | --- |
-| m_speed | Player only | Yes | No | Capture 0-318 km/h; exact game comparison incomplete |
-| m_throttle | Player only, displayed as percent | Yes | No | Capture 0-100%; exact game comparison incomplete |
-| m_steer | Player only | Yes | No | Capture approximately -1.00 to +0.73; full travel and exact comparison incomplete |
-| m_brake | Player only, displayed as percent | Yes | No | Capture 0-100%; exact game comparison incomplete |
-| m_clutch | Player only, percent; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_gear | Player only, signed | Yes | No | Neutral and 1-8 observed; reverse uses signed decoding but was not observed; exact comparison incomplete |
-| m_engineRPM | Player only | Yes | No | Capture 3920-13204 RPM; exact game comparison incomplete |
-| m_drs | Player only, Closed/Open display; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_revLightsPercent | Player only, percent; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_revLightsBitValue | No | Yes | No | Not checked |
-| m_brakesTemperature | Player only, all four wheels; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_tyresSurfaceTemperature | Player only, all four wheels; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_tyresInnerTemperature | Player only, all four wheels, displayed as core temperature; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_engineTemperature | Player only; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_tyresPressure | Player only, all four wheels in PSI; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_surfaceType | Player only, all four wheel IDs and name lookup; syntax check passed | Yes | No | Playback and game comparison pending |
-| m_mfdPanelIndex | No | Yes | No | Not checked |
-| m_mfdPanelIndexSecondaryPlayer | No | Yes | No | Not checked |
-| m_suggestedGear | No | Yes | No | Not checked |
+| m_speed | Player only | Yes | Passed Nov 4 | Capture 0-318 km/h; exact game comparison incomplete |
+| m_throttle | Player only, displayed as percent | Yes | Passed Nov 4 | Capture 0-100%; exact game comparison incomplete |
+| m_steer | Player only | Yes | Passed Nov 4 | Capture approximately -1.00 to +0.73; full travel and exact comparison incomplete |
+| m_brake | Player only, displayed as percent | Yes | Passed Nov 4 | Capture 0-100%; exact game comparison incomplete |
+| m_clutch | Player only, percent; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_gear | Player only, signed | Yes | Passed Nov 4 | Neutral and 1-8 observed; reverse uses signed decoding but was not observed; exact comparison incomplete |
+| m_engineRPM | Player only | Yes | Passed Nov 4 | Capture 3920-13204 RPM; exact game comparison incomplete |
+| m_drs | Player only, Closed/Open display; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_revLightsPercent | Player only, percent; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_revLightsBitValue | No | Yes | Not tested | Not checked |
+| m_brakesTemperature | Player only, all four wheels; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_tyresSurfaceTemperature | Player only, all four wheels; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_tyresInnerTemperature | Player only, all four wheels, displayed as core temperature; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_engineTemperature | Player only; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_tyresPressure | Player only, all four wheels in PSI; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_surfaceType | Player only, all four wheel IDs and name lookup; syntax check passed | Yes | Passed Nov 4 | Real-capture playback and game comparison pending |
+| m_mfdPanelIndex | No | Yes | Not tested | Not checked |
+| m_mfdPanelIndexSecondaryPlayer | No | Yes | Not tested | Not checked |
+| m_suggestedGear | No | Yes | Not tested | Not checked |
 
-Before engine temperature was added, recorded playback processed 71,243 records, including 9,695 Car Telemetry packets. This is evidence of successful playback with plausible values, not complete decoder verification; it does not cover the temperature, pressure, contact-surface, clutch, DRS, or rev-light-percentage additions. Other car slots, split-screen behavior, multiplayer availability, malformed inputs, and exact in-game comparisons remain untested or incomplete. The decoder currently checks enough bytes for selected fields, not the complete 1448-byte layout.
+Before engine temperature was added, recorded playback processed 71,243 records, including 9,695 Car Telemetry packets. This is evidence of successful playback with plausible values, not complete decoder verification; it does not cover the temperature, pressure, contact-surface, clutch, DRS, or rev-light-percentage additions. Synthetic checks cover player indices 0 and 23 only; intermediate indices, simultaneous multi-car decoding, split-screen behavior, multiplayer availability, malformed inputs, and exact in-game comparisons remain untested or incomplete. The temporary harness checked console values for all implemented fields, reverse gear, and an unknown surface ID using an in-memory capture and input-format substitution. No permanent telemetry fixtures were added. The decoder currently checks enough bytes for selected fields, not the complete 1448-byte layout.
 
 ## Surface lookup
 
@@ -112,4 +112,4 @@ Before engine temperature was added, recorded playback processed 71,243 records,
 | 10 | Metal |
 | 11 | Ridged |
 
-The surface lookup is implemented for all four player wheels. Unknown IDs display Unknown; raw IDs remain in the decoded tuple but are not printed. Unknown-value behavior has been reviewed in code, not fixture-tested.
+The surface lookup is implemented for all four player wheels. Unknown IDs display Unknown; raw IDs remain in the decoded tuple but are not printed. An unknown surface ID passed the November 4 temporary synthetic assertion. Unknown DRS values were reviewed in code but not exercised by that check; no permanent enum fixtures exist.
